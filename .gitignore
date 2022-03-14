@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+.vscode/
+.env
+.nx
+.webpack-cache
+
+# Local environment files
+.env.*
+!.env.example
+!.example.env
