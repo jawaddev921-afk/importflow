@@ -1,0 +1,99 @@
+{
+  "name": "importflow",
+  "version": "1.10.0",
+  "description": "Open source infrastructure to import data easily",
+  "private": true,
+  "scripts": {
+    "clean": "pnpm run prebuild && lerna clean --yes",
+    "lint": "npx nx run-many --target=lint --all",
+    "kill-ports": "npx kill-port 4701 3000 3500 4200",
+    "start:dev": "npx nx run-many --target=start -p @importflow/api @importflow/web @importflow/widget @importflow/embed @importflow/queue-manager --parallel=5",
+    "start:dal": "cross-env npx nx run @importflow/dal:start",
+    "start:api": "cross-env npx nx run @importflow/api:start",
+    "start:embed": "cross-env npx nx run @importflow/embed:start",
+    "start:widget": "cross-env npx nx run @importflow/widget:start",
+    "start:queue-manager": "cross-env npx nx run @importflow/queue-manager:start",
+    "start:web": "cross-env npx nx run @importflow/web:start",
+    "prebuild": "npx nx run-many --target=prebuild --all",
+    "build": "npx nx run-many --target=build --all",
+    "build:api": "npx nx build @importflow/api",
+    "build:dal": "npx nx build @importflow/dal",
+    "build:angular": "npx nx build @importflow/angular",
+    "build:react": "npx nx build @importflow/react",
+    "build:shared": "npx nx build @importflow/shared",
+    "build:widget": "npx nx build @importflow/widget",
+    "build:embed": "npx nx build @importflow/embed",
+    "build:client": "npx nx build @importflow/client",
+    "build:web": "npx nx build @importflow/web",
+    "build:services": "npx nx build @importflow/services",
+    "build:queue-manager": "npx nx build @importflow/queue-manager",
+    "start:static:widget": "cross-env npx npx nx start:static:build @importflow/widget",
+    "start:static:web": "cross-env npx nx start:static:build @importflow/web",
+    "release:major": "lerna version major --no-push",
+    "release:patch": "lerna version patch --no-push",
+    "release:minor": "lerna version minor --no-push",
+    "release:preminor": "lerna version preminor --no-push",
+    "release:prerelease": "lerna version prerelease --no-push",
+    "publish": "pnpm build && pnpm -r --if-present publish",
+    "postinstall": "pnpm build"
+  },
+  "keywords": [
+    "data-import",
+    "excel-import",
+    "csv-import",
+    "importflow"
+  ],
+  "author": "Jawad",
+  "license": "MIT",
+  "workspaces": {
+    "packages": [
+      "apps/*",
+      "libs/*",
+      "packages/*"
+    ]
+  },
+  "lint-staged": {
+    "apps/**/*.{ts,tsx,json}": [
+      "prettier --ignore-path ./.prettierignore --write",
+      "eslint --fix"
+    ],
+    "packages/**/*.{ts,tsx,json}": [
+      "prettier --ignore-path ./.prettierignore --write",
+      "eslint --fix"
+    ],
+    "libs/**/*.{ts,js,json}": [
+      "prettier --ignore-path ./.prettierignore --write",
+      "eslint --fix"
+    ]
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^16.2.1",
+    "@commitlint/config-conventional": "^16.2.1",
+    "@nrwl/nx-cloud": "^13.1.6",
+    "@nrwl/workspace": "13.8.8",
+    "@typescript-eslint/eslint-plugin": "^5.14.0",
+    "@typescript-eslint/parser": "^5.14.0",
+    "cross-env": "^7.0.3",
+    "eslint": "^8.11.0",
+    "eslint-config-airbnb-typescript": "^16.1.2",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-eslint-comments": "^3.2.0",
+    "eslint-plugin-functional": "^4.2.0",
+    "eslint-plugin-import": "^2.25.4",
+    "eslint-plugin-jsx-a11y": "^6.5.1",
+    "eslint-plugin-prettier": "4.0.0",
+    "eslint-plugin-promise": "^6.0.0",
+    "eslint-plugin-react": "^7.29.4",
+    "eslint-plugin-react-hooks": "^4.3.0",
+    "fs-extra": "^10.0.1",
+    "husky": "^7.0.4",
+    "lerna": "^4.0.0",
+    "lint-staged": "^12.3.5",
+    "nx": "^13.8.8",
+    "prettier": "2.5.1"
+  },
+  "dependencies": {
+    "amqp-connection-manager": "^4.1.1",
+    "amqplib": "^0.8.0"
+  }
+}
