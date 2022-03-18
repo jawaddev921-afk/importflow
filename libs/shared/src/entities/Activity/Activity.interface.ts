@@ -1,0 +1,29 @@
+export interface IHistoryRecord {
+  _id: string;
+  _uploadedFileId: string;
+  totalRecords: number;
+  status: string;
+  uploadedDate: string;
+  validRecords: number;
+  webhookLogs: Record<string, any>[];
+  hasWebhookLogs?: boolean;
+  originalFileName: string;
+  name: string;
+  type: string;
+  destination: string;
+}
+
+export interface IPaginationData<T = any> {
+  data: T[];
+  limit: number;
+  page: number;
+  totalPages: number;
+  totalRecords: number;
+}
+
+export interface ISummaryData {
+  yearly: number;
+  monthly: number;
+  weekly: number;
+  uploads: { date: string; count: number }[];
+}
