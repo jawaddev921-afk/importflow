@@ -1,0 +1,32 @@
+{
+  "name": "@importflow/dal",
+  "version": "1.10.0",
+  "author": "Jawad",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "start": "pnpm run build:watch",
+    "prebuild": "rimraf dist",
+    "start:dev": "pnpm run build:watch",
+    "build": "cross-env node_modules/.bin/tsc -p tsconfig.build.json",
+    "build:watch": "cross-env node_modules/.bin/tsc -p tsconfig.build.json -w --preserveWatchOutput",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix"
+  },
+  "dependencies": {
+    "@importflow/shared": "workspace:^",
+    "class-transformer": "^0.5.1",
+    "date-fns": "^2.28.0",
+    "mongoose": "6.2.6",
+    "rimraf": "^3.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^17.0.21",
+    "eslint-plugin-prettier": "4.0.0",
+    "nodemon": "^2.0.15",
+    "ts-node": "^10.7.0",
+    "tsconfig-paths": "^3.14.0",
+    "typescript": "^4.6.2"
+  }
+}
