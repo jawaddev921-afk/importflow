@@ -1,0 +1,6 @@
+{
+  "watch": ["src", "node_modules/@importflow"],
+  "ext": "ts",
+  "ignore": ["src/**/*.spec.ts"],
+  "exec": "ts-node src/index.ts"
+}
