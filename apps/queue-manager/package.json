@@ -1,0 +1,42 @@
+{
+  "name": "@importflow/queue-manager",
+  "version": "1.10.0",
+  "author": "Jawad",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "prebuild": "rimraf dist",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "build": "cross-env node_modules/.bin/tsc -p tsconfig.build.json",
+    "start": "cross-env TZ=UTC nodemon",
+    "start:prod": "cross-env TZ=UTC node ./dist/index.js",
+    "start:dev": "cross-env TZ=UTC nodemon",
+    "precommit": "lint-staged",
+    "lint": "eslint src",
+    "lint:fix": "pnpm lint -- --fix"
+  },
+  "dependencies": {
+    "@importflow/dal": "workspace:^",
+    "@importflow/services": "workspace:^",
+    "@importflow/shared": "workspace:^",
+    "@sentry/node": "^6.18.2",
+    "axios": "0.26.1",
+    "dayjs": "^1.11.0",
+    "dotenv": "^16.0.0",
+    "envalid": "^7.3.0",
+    "papaparse": "^5.3.1",
+    "xml2js": "^0.4.23"
+  },
+  "devDependencies": {
+    "@types/node": "^17.0.21",
+    "nodemon": "^2.0.15",
+    "rimraf": "^3.0.2",
+    "ts-node": "^10.7.0",
+    "typescript": "^4.6.2"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix"
+    ]
+  }
+}
