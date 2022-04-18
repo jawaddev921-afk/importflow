@@ -1,0 +1,58 @@
+{
+  "name": "@importflow/react",
+  "version": "1.10.0",
+  "description": "React library to show CSV Excel Importer in react applications",
+  "license": "MIT",
+  "author": "Jawad",
+  "repository": "https://github.com/jawaddev921-afk/importflow",
+  "types": "dist/index.d.ts",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "keywords": [
+    "importflow",
+    "importflowhq",
+    "data-import",
+    "excel-import",
+    "csv-import"
+  ],
+  "files": [
+    "dist",
+    "README.md",
+    "package.json"
+  ],
+  "scripts": {
+    "lint": "eslint src",
+    "lint:fix": "pnpm lint --fix",
+    "start": "npm run build:watch",
+    "prebuild": "rimraf dist",
+    "build": "rollup -c",
+    "build:watch": "rollup -c -w"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "react": ">=17.0.2"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.17.7",
+    "@rollup/plugin-commonjs": "^21.0.2",
+    "@rollup/plugin-node-resolve": "^13.1.3",
+    "@rollup/plugin-typescript": "^8.3.1",
+    "@types/react": "^17.0.40",
+    "@types/react-dom": "17.0.13",
+    "@types/styled-components": "^5.1.24",
+    "babel-loader": "^8.2.3",
+    "rimraf": "^3.0.2",
+    "rollup": "^2.70.1",
+    "rollup-plugin-dts": "^4.2.0",
+    "rollup-plugin-node-externals": "^4.0.0",
+    "rollup-plugin-peer-deps-external": "^2.2.4",
+    "rollup-plugin-terser": "^7.0.2",
+    "tslib": "^2.3.1",
+    "typescript": "^4.6.2"
+  },
+  "dependencies": {
+    "@importflow/client": "^0.29.0"
+  }
+}
