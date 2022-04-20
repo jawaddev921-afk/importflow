@@ -1,0 +1,110 @@
+import { CookieOptions } from 'express';
+
+export const APIMessages = {
+  FILE_TYPE_NOT_VALID: 'File type is not supported.',
+  FILE_IS_EMPTY: 'File is empty',
+  FILE_CONTENT_INVALID: 'File content is invalid. Please check the file or upload new file.',
+  FILE_HAS_ISSUE: 'Uploaded file has some issues. Please check the file or upload new file.',
+  EMPTY_HEADING_PREFIX: 'Empty Heading',
+  INVALID_TEMPLATE_ID_CODE_SUFFIX: 'is not valid TemplateId or CODE.',
+  FILE_MAPPING_REMAINING: 'File mapping is not yet done, please finalize mapping before.',
+  UPLOAD_NOT_FOUND: 'Upload information not found with specified uploadId.',
+  TEMPLATE_NOT_FOUND: 'Template not found with specified templateId.',
+  FILE_NOT_FOUND_IN_STORAGE:
+    "File not found, make sure you're using the same storage provider, that you were using before.",
+  DO_MAPPING_FIRST: 'You may landed to wrong place, Please finalize mapping and proceed ahead.',
+  DO_REVIEW_FIRST: 'You may landed to wrong place, Please review data and proceed ahead.',
+  DO_CONFIRM_FIRST: 'You may landed to wrong place, Please confirm data and proceed ahead.',
+  ALREADY_CONFIRMED: '`You may landed to wrong place, This upload file is confirmed already.',
+  IN_PROGRESS: 'You may landed to wrong place, This uploaded file processing is started already.',
+  COMPLETED: 'You may landed to wrong place, This uploaded file is already completed, no more steps left to perform.',
+  PROJECT_WITH_TEMPLATE_MISSING: 'Template not found with provided ProjectId and Template',
+  PROJECT_NOT_ASSIGNED: 'Project is not assigned to you',
+  USER_NOT_FOUND: 'User is not found',
+  USER_JOB_NOT_FOUND: 'User-Job is not found',
+  UNIQUE_EMAIL: 'Email address already in use',
+  INCORRECT_LOGIN_CREDENTIALS: 'Incorrect email or password provided',
+  OPERATION_NOT_ALLOWED: `You're not allowed to perform this action.`,
+  EMAIL_ALREADY_EXISTS: 'Email already exists',
+  INCORRECT_KEYS_FOUND: 'Invalid keys found! Please check and correct them from web',
+  INVALID_AUTH_TOKEN: 'Invalid authentication token',
+  INVALID_RSS_URL: 'The Specified URL doesn`t contain any RSS XML Feed, Please enter a Valid RSS XML URL',
+  COLUMN_KEY_TAKEN: 'Column with the same key already exists. Please provide a unique key from "Validations".',
+  COLUMN_KEY_DUPLICATED: 'Column with the same key already exists. Please use a unique key in column.',
+  ERROR_DURING_VALIDATION:
+    'Something went wrong while validating data. Data is not imported yet, but team is informed about issue. Please try again after sometime.',
+  FEATURE_UNAVAILABLE: {
+    IMAGE_IMPORT: 'Image Import unavailable on current plan',
+    ADVANCED_VALIDATIONS: 'Advanced validations are unavailable on your current plan',
+  },
+  INVALID_VERIFICATION_CODE: 'Code you entered is invalid! Please try again or request new verification code!',
+  ONBOARD_TEMPLATE_FILE_SIZE_EXCEED: 'File size exceeds the maximum limit of 10 MB',
+  ONBOARD_TEMPLATE_SHEET_NOT_FOUND: 'No sheets found in the workbook',
+  ONBOARD_TEMPLATE_FILE_EMPTY: 'File is empty or invalid',
+  ONBOARD_TEMPLATE_FILE_EMPTY_RECORDS: 'The file contains empty records',
+
+  INVALID_API_RESPONSE_STRUCTURE: `Invalid API response structure. Please recheck the URL and ensure the API is correctly configured to return data.`,
+  DATATYPE_EMPTY: `The datatype appears to be empty. Please add at least one entry and verify the URL points to the correct data source.`,
+};
+
+export const CONSTANTS = {
+  PASSWORD_SALT: 10,
+  EXCEL_DATA_SHEET_STARTER: 'imp_',
+  AUTH_COOKIE_NAME: 'authentication',
+  // eslint-disable-next-line no-magic-numbers
+  maxAge: 1000 * 60 * 60 * 4, // 4 hours (reduced from 24h for security)
+  DEFAULT_USER_AVATAR: 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y',
+  CHUNK_VARIABLES: ['page', 'chunkSize', 'template', 'uploadId', 'fileName', 'extra'],
+  CHUNK_FORMAT: `{
+  "data": "{{data}}",
+  "page": "{{page}}",
+  "chunkSize": "{{chunkSize}}",
+  "template": "{{template}}",
+  "uploadId": "{{uploadId}}",
+  "fileName": "{{fileName}}",
+  "extra": "{{extra}}"
+}`,
+  COMBINED_FORMAT: `{
+  "%data%": {},
+  "page": "{{page}}",
+  "chunkSize": "{{chunkSize}}",
+  "template": "{{template}}",
+  "uploadId": "{{uploadId}}",
+  "fileName": "{{fileName}}",
+  "extra": "{{extra}}"
+}`,
+  BUBBLEIO_PROPS: {},
+};
+
+export const COOKIE_CONFIG: CookieOptions = {
+  httpOnly: true,
+  secure: true,
+  maxAge: CONSTANTS.maxAge,
+  sameSite: 'none',
+};
+
+export const VARIABLES = {
+  ONE: 1,
+  TWO: 2,
+};
+
+export const DATE_FORMATS = {
+  COMMON: 'DD MMM YYYY',
+};
+
+// eslint-disable-next-line @typescript-eslint/naming-convention
+export enum LEAD_SIGNUP_USING {
+  GITHUB = 'Github',
+  EMAIL = 'Email',
+}
+
+export const CRON_SCHEDULE = {
+  AUTO_IMPORT_DEFAULT_CRON_TIME: '45 23 * * *',
+  UPLOAD_CLEANUP_DEFAULT_CRON_TIME: '30 22 * * *', //Cron - Every Night at 10:30 PM
+  TEST_CRON_TIME: '* * * * *',
+  CRON_TIME: '45 23 * * *',
+  UPLOAD_CLEANUP_DAYS: 30,
+};
+
+export const TYPE_CHECK_SAMPLE = 10;
+export const MAX_FILE_SIZE = 10 * 1024 * 1024;
