@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowSyntheticDefaultImports": true,
+    "emitDecoratorMetadata": true,
+    "types": ["node", "multer", "mocha", "chai"],
+    "target": "esnext",
+    "allowJs": false,
+    "esModuleInterop": false,
+    "declarationMap": true,
+    "baseUrl": "src",
+    "paths": {
+      "@shared/*": ["app/shared/*"],
+    }
+  }
+}
