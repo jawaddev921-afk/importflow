@@ -1,0 +1,210 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsArray,
+  IsBoolean,
+  IsOptional,
+  IsString,
+  IsEnum,
+  IsNumber,
+  Min,
+  Max,
+  ValidateIf,
+  IsNotEmpty,
+  Validate,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+
+import { ValidationTypesEnum } from '@importflow/client';
+import { IsValidRegex } from '@shared/framework/is-valid-regex.validator';
+import { IsValidDigitsConstraint } from '@shared/framework/is-valid-digits.validator';
+import { IsNumberOrString } from '@shared/framework/number-or-string.validator';
+import { ColumnDelimiterEnum, ColumnTypesEnum, MAX_IMAGE_SIZE_MB_LIMIT } from '@importflow/shared';
+
+export class ValidationDto {
+  @ApiProperty({
+    description: 'Specifies the type of column',
+    enum: ValidationTypesEnum,
+  })
+  @IsEnum(ValidationTypesEnum, {
+    message: `type must be one of ${Object.values(ValidationTypesEnum).join(', ')}`,
+  })
+  validate: ValidationTypesEnum;
+
+  @ApiPropertyOptional({
+    description: 'Message to be shown on error',
+  })
+  @IsString()
+  @IsOptional()
+  errorMessage?: string;
+
+  @ApiPropertyOptional({
+    description: 'Minimum value for digit validation',
+  })
+  @IsNumber()
+  @IsOptional()
+  @ValidateIf((object) => object.validate === ValidationTypesEnum.DIGITS)
+  @Validate(IsValidDigitsConstraint, {
+    message: 'Invalid number of digits',
+  })
+  min?: number;
+
+  @ApiPropertyOptional({
+    description: 'Maximum value for digit validation',
+  })
+  @IsNumber()
+  @IsOptional()
+  @ValidateIf((object) => object.validate === ValidationTypesEnum.DIGITS)
+  @Validate(IsValidDigitsConstraint, {
+    message: 'Invalid number of digits',
+  })
+  max?: number;
+
+  @ApiPropertyOptional({
+    description: 'Unique key of the validator',
+  })
+  @IsString()
+  @ValidateIf((object) => object.validate === ValidationTypesEnum.UNIQUE_WITH)
+  uniqueKey: string;
+}
+
+export class ColumnRequestDto {
+  @ApiProperty({
+    description: 'Name of the column',
+    type: 'string',
+  })
+  @IsString()
+  name: string;
+
+  @ApiProperty({
+    description: 'Key of the column',
+  })
+  @IsString()
+  key: string;
+
+  @ApiProperty({
+    description: 'Description of the column',
+  })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiProperty({
+    description: 'Alternative possible keys of the column',
+    type: Array<string>,
+  })
+  @IsArray()
+  @IsOptional()
+  @Type(() => Array<string>)
+  alternateKeys: string[];
+
+  @ApiPropertyOptional({
+    description: 'While true, it Indicates column value should exists in data',
+  })
+  @IsBoolean()
+  @IsOptional()
+  isRequired? = false;
+
+  @ApiPropertyOptional({
+    description: 'While true, it Indicates column value should be unique in data',
+  })
+  @IsBoolean()
+  @IsOptional()
+  isUnique? = false;
+
+  @ApiPropertyOptional({
+    description: 'While true, it Indicates column value should be frozen in data',
+  })
+  @IsBoolean()
+  @IsOptional()
+  isFrozen? = false;
+
+  @ApiProperty({
+    description: 'Specifies the type of column',
+    enum: ColumnTypesEnum,
+  })
+  @IsEnum(ColumnTypesEnum, {
+    message: `type must be one of ${Object.values(ColumnTypesEnum).join(', ')}`,
+  })
+  type: ColumnTypesEnum;
+
+  @ApiPropertyOptional({
+    description: 'Regex if type is Regex',
+  })
+  @ValidateIf((object) => object.type === ColumnTypesEnum.REGEX)
+  @Validate(IsValidRegex)
+  @IsNotEmpty()
+  regex: string;
+
+  @ApiPropertyOptional({
+    description: 'Description of Regex',
+  })
+  @ValidateIf((object) => object.type === ColumnTypesEnum.REGEX)
+  @IsString()
+  @IsOptional()
+  regexDescription: string;
+
+  @ApiPropertyOptional({
+    description: 'List of possible values for column if type is Select',
+  })
+  @ValidateIf((object) => object.type === ColumnTypesEnum.SELECT)
+  @Type(() => Array<string>)
+  selectValues: string[] = [];
+
+  @ApiPropertyOptional({
+    description: 'List of date formats for column if type is Date',
+  })
+  @ValidateIf((object) => object.type === ColumnTypesEnum.DATE)
+  @Type(() => Array<string>)
+  dateFormats: string[];
+
+  @ApiPropertyOptional({
+    description: `Maximum allowed image size in MB if type is Image (max ${MAX_IMAGE_SIZE_MB_LIMIT})`,
+  })
+  @ValidateIf((object) => object.type === ColumnTypesEnum.IMAGE)
+  @IsNumber()
+  @Min(1)
+  @Max(MAX_IMAGE_SIZE_MB_LIMIT)
+  @IsOptional()
+  maxImageSize?: number;
+
+  @ApiProperty({
+    description: 'Sequence of column',
+  })
+  @IsNumber()
+  @IsOptional()
+  sequence: number;
+
+  @ApiProperty({
+    description: 'Default value for cell',
+  })
+  @IsOptional()
+  @Validate(IsNumberOrString)
+  defaultValue?: string | number;
+
+  @ApiPropertyOptional({
+    description: 'If true, column can have multiple values',
+  })
+  @IsBoolean()
+  @IsOptional()
+  allowMultiSelect?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Specify the delimiter for multi-select value',
+    enum: ColumnDelimiterEnum,
+  })
+  @IsOptional()
+  @IsEnum(ColumnDelimiterEnum, {
+    message: `Delimiter must be one of ${Object.values(ColumnDelimiterEnum).join(', ')}`,
+  })
+  delimiter?: ColumnDelimiterEnum;
+
+  @ApiPropertyOptional({
+    description: 'Validations for column',
+  })
+  @IsArray()
+  @IsOptional()
+  @Type(() => ValidationDto)
+  @ValidateNested({ each: true })
+  validations?: ValidationDto[];
+}
