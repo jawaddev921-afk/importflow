@@ -1,0 +1,812 @@
+/* eslint-disable multiline-comment-style */
+import * as fs from 'fs';
+import * as dayjs from 'dayjs';
+import * as Papa from 'papaparse';
+import { Writable } from 'stream';
+import { cpus } from 'os';
+import addFormats from 'ajv-formats';
+import addKeywords from 'ajv-keywords';
+import * as customParseFormat from 'dayjs/plugin/customParseFormat';
+import Ajv, { AnySchemaObject, ErrorObject, ValidateFunction } from 'ajv';
+
+import { ValidationErrorMessages } from '@shared/types/review.types';
+import { ColumnTypesEnum, Defaults, ITemplateSchemaItem } from '@importflow/shared';
+import { SManager, BATCH_LIMIT, MAIN_CODE, ExecuteIsolateResult } from '@shared/services/sandbox';
+import { ValidationTypesEnum, LengthValidationType, RangeValidationType, DigitsValidationType } from '@importflow/client';
+
+dayjs.extend(customParseFormat);
+
+interface IDataItem {
+  index: number;
+  errors?: Record<string, string>;
+  isValid: boolean;
+  record: Record<string, any>;
+  updated: Record<string, boolean>;
+}
+interface IBatchItem {
+  uploadId: string;
+  data: IDataItem[];
+  batchCount: number;
+  extra: any;
+  // totalRecords: number;
+}
+interface IRunData {
+  extra: any;
+  uploadId: string;
+  headerRow: number;
+  headings: string[];
+  csvFileStream: any;
+  dataStream: Writable;
+  validator: ValidateFunction;
+  numberColumnHeadings: Set<string>;
+  dateFormats: Record<string, string[]>;
+  uniqueCombinations: Record<string, string[]>;
+  validationErrorMessages: ValidationErrorMessages;
+  multiSelectColumnHeadings: Record<string, string>;
+}
+
+interface ISaveResults {
+  uploadId: string;
+  totalRecords: number;
+  validRecords: number;
+  invalidRecords: number;
+}
+
+export class BaseReview {
+  private sandboxManager: SManager;
+  private readonly multiSelectRegexCache = new Map<string, { trim: RegExp; dedupe: RegExp }>();
+  constructor() {
+    this.sandboxManager = new SManager();
+  }
+
+  private getBatchConcurrency() {
+    return Math.min(8, Math.max(1, cpus().length || 1));
+  }
+
+  private escapeRegExp(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private getMultiSelectRegex(delimiter: string) {
+    const cached = this.multiSelectRegexCache.get(delimiter);
+    if (cached) return cached;
+
+    const escapedDelimiter = this.escapeRegExp(delimiter);
+    const regex = {
+      trim: new RegExp(`^(?:${escapedDelimiter})+|(?:${escapedDelimiter})+$`, 'g'),
+      dedupe: new RegExp(`(?:${escapedDelimiter}){2,}`, 'g'),
+    };
+
+    this.multiSelectRegexCache.set(delimiter, regex);
+
+    return regex;
+  }
+
+  private async writeToStream(dataStream: Writable, item: IDataItem) {
+    const canContinue = dataStream.write(item);
+    if (canContinue) return;
+    await new Promise<void>((resolve) => dataStream.once('drain', resolve));
+  }
+
+  buildAJVSchema({
+    columns,
+    dateFormats,
+    uniqueItems,
+  }: {
+    columns: ITemplateSchemaItem[];
+    dateFormats: Record<string, string[]>;
+    uniqueItems: Record<string, Set<any>>;
+  }) {
+    const formattedColumns: Record<string, ITemplateSchemaItem> = columns.reduce((acc, column) => {
+      acc[column.key] = { ...column };
+
+      return acc;
+    }, {});
+    const properties: Record<string, unknown> = columns.reduce((acc, column) => {
+      acc[column.key] = this.getProperty(formattedColumns[column.key]);
+
+      return acc;
+    }, {});
+    const requiredProperties: string[] = columns.reduce((acc, column) => {
+      if (formattedColumns[column.key].isRequired) acc.push(column.key);
+
+      return acc;
+    }, []);
+
+    // setting uniqueItems to empty set to avoid error
+    columns.forEach((column) => {
+      if (formattedColumns[column.key].isUnique) {
+        uniqueItems[column.key] = new Set();
+      }
+      if (formattedColumns[column.key].type === ColumnTypesEnum.DATE) {
+        if (
+          Array.isArray(formattedColumns[column.key].dateFormats) &&
+          formattedColumns[column.key].dateFormats.length > 0
+        )
+          dateFormats[column.key] = formattedColumns[column.key].dateFormats;
+        else dateFormats[column.key] = Defaults.DATE_FORMATS;
+      }
+    });
+
+    return {
+      type: 'object',
+      properties,
+      required: requiredProperties,
+      // additionalProperties: false,
+    };
+  }
+
+  private getProperty(column: ITemplateSchemaItem): Record<string, unknown> {
+    let property: Record<string, unknown> = {};
+    const rangeValidation = column.validations?.find(
+      (validation) => validation.validate === ValidationTypesEnum.RANGE
+    ) as RangeValidationType;
+    const lengthValidation = column.validations?.find(
+      (validation) => validation.validate === ValidationTypesEnum.LENGTH
+    ) as LengthValidationType;
+    const digitsValidation = column.validations?.find(
+      (validation) => validation.validate === ValidationTypesEnum.DIGITS
+    ) as DigitsValidationType;
+
+    switch (column.type) {
+      case ColumnTypesEnum.STRING:
+        property = {
+          type: 'string',
+          ...(typeof lengthValidation?.min === 'number' && { minLength: lengthValidation?.min }),
+          ...(typeof lengthValidation?.max === 'number' && { maxLength: lengthValidation?.max }),
+        };
+        break;
+      case ColumnTypesEnum.NUMBER:
+      case ColumnTypesEnum.DOUBLE: {
+        const isInteger = column.type === ColumnTypesEnum.NUMBER;
+
+        property = {
+          type: ['number', 'null'],
+          ...(!column.isRequired && { default: null }),
+
+          // only enforce integer for NUMBER
+          //...(isInteger && { multipleOf: 1 }),
+
+          // normal range validation (applies to both)
+          ...(typeof rangeValidation?.min === 'number' && { minimum: rangeValidation?.min }),
+          ...(typeof rangeValidation?.max === 'number' && { maximum: rangeValidation?.max }),
+
+          // digit validation (only for NUMBER)
+          ...(isInteger &&
+            digitsValidation && {
+              digitCount: {
+                ...(typeof digitsValidation.min === 'number' && { min: digitsValidation.min }),
+                ...(typeof digitsValidation.max === 'number' && { max: digitsValidation.max }),
+              },
+            }),
+        };
+        break;
+      }
+      case ColumnTypesEnum.SELECT:
+      case ColumnTypesEnum.IMAGE:
+        const selectValues =
+          Array.isArray(column.selectValues) && column.selectValues.length > 0
+            ? [...column.selectValues, ...(column.isRequired ? [] : [''])]
+            : [''];
+        if (column.allowMultiSelect)
+          property = {
+            type: 'array',
+            items: {
+              type: 'string',
+              enum: selectValues,
+            },
+          };
+        else
+          property = {
+            type: 'string',
+            enum: Array.from(new Set(selectValues)), // handle duplicate
+            ...(!column.isRequired && { default: '' }),
+          };
+        break;
+      case ColumnTypesEnum.REGEX:
+        const [full, pattern, flags] = column.regex.match(/\/(.*)\/(.*)|(.*)/);
+
+        property = {
+          type: ['string', 'null'],
+          default: null,
+          regexp: { pattern: pattern || full, flags: flags || '' },
+        };
+        break;
+      case ColumnTypesEnum.EMAIL:
+        property = {
+          type: ['string', 'null'],
+          format: 'email',
+          default: null,
+        };
+        break;
+      case ColumnTypesEnum.DATE:
+        property = { type: ['string', 'null'], customDateChecker: true, default: null };
+        break;
+      case ColumnTypesEnum.ANY:
+        property = { type: ['string', 'number', 'object', 'null'] };
+        break;
+    }
+
+    return {
+      ...property,
+      ...(column.isUnique && { uniqueCheck: true }),
+      ...(column.isRequired && { emptyCheck: true }),
+    };
+  }
+
+  private getErrorsObject(
+    errors: ErrorObject[],
+    dateFormats: Record<string, string[]>,
+    validationErrorMessages: ValidationErrorMessages,
+    uniqueCombinations: Record<string, string[]>
+  ): Record<string, string> {
+    let field: string;
+
+    return errors.reduce((obj, error) => {
+      if (!!uniqueCombinations[error.keyword]) {
+        uniqueCombinations[error.keyword].forEach((columnKey) => {
+          obj[columnKey] = this.getMessage({
+            error,
+            data: error.data,
+            field: columnKey,
+            dateFormats,
+            uniqueCombinations,
+            validationErrorMessages,
+          });
+        });
+      } else {
+        if (error.keyword === 'required') field = error.params.missingProperty;
+        else [, , field] = error.instancePath.split('/');
+
+        field = field.replace(/~1/g, '/');
+        obj[field] = this.getMessage({
+          error,
+          data: error.data,
+          field: field || error.schema[0],
+          dateFormats,
+          uniqueCombinations,
+          validationErrorMessages,
+        });
+      }
+
+      return obj;
+    }, {});
+  }
+
+  private getMessage({
+    data,
+    dateFormats,
+    error,
+    field,
+    uniqueCombinations,
+    validationErrorMessages,
+  }: {
+    field: string;
+    data: unknown;
+    error: ErrorObject;
+    dateFormats: Record<string, string[]>;
+    uniqueCombinations: Record<string, string[]>;
+    validationErrorMessages?: ValidationErrorMessages;
+  }): string {
+    let message = '';
+    switch (true) {
+      // maximum length case
+      case error.keyword === 'maxLength':
+        message =
+          validationErrorMessages?.[field]?.[ValidationTypesEnum.LENGTH] ||
+          `Length must be less than or equal to ${error.params.limit}`;
+        break;
+      // maximum length case
+      case error.keyword === 'minLength':
+        message =
+          validationErrorMessages?.[field]?.[ValidationTypesEnum.LENGTH] ||
+          `Length must be greater than or equal to ${error.params.limit}`;
+        break;
+      // maximum number case
+      case error.keyword === 'maximum':
+        message =
+          validationErrorMessages?.[field]?.[ValidationTypesEnum.RANGE] ||
+          `${String(data)} must be less than or equal to ${error.params.limit}`;
+        break;
+      // minimum number case
+      case error.keyword === 'minimum':
+        message =
+          validationErrorMessages?.[field]?.[ValidationTypesEnum.RANGE] ||
+          `${String(data)} must be greater than or equal to ${error.params.limit}`;
+        break;
+      case error.keyword === 'digitCount': {
+        const customMessage = validationErrorMessages?.[field]?.[ValidationTypesEnum.DIGITS];
+        if (customMessage) {
+          message = customMessage;
+        } else {
+          const minDigits = error.parentSchema.digitCount.min;
+          const maxDigits = error.parentSchema.digitCount.max;
+
+          if (minDigits !== undefined && maxDigits !== undefined) {
+            if (minDigits === maxDigits) {
+              message = `Must have exactly ${minDigits} digits`;
+            } else {
+              message = `Must have between ${minDigits} and ${maxDigits} digits`;
+            }
+          } else if (minDigits !== undefined) {
+            message = `Must have at least ${minDigits} digits`;
+          } else if (maxDigits !== undefined) {
+            message = `Must have at most ${maxDigits} digits`;
+          } else {
+            message = 'Invalid number of digits';
+          }
+        }
+        break;
+      }
+      // empty string case
+      case error.keyword === 'emptyCheck':
+      case error.keyword === 'required':
+        message = `This field is required`;
+        break;
+      // customDateChecker
+      case error.keyword === 'customDateChecker':
+        message = `${String(data)} must match date format from [${dateFormats[field].toString()}]`;
+        break;
+      // uniqueCheck
+      case error.keyword === 'uniqueCheck':
+      case error.keyword === 'uniqueItemProperties':
+        message = `${String(data)} already taken! Please enter unique value`;
+        break;
+      // custom date format
+      case error.keyword === 'format' && error.params.format === 'custom-date-time':
+        message = `${String(data)} is not a valid date`;
+        break;
+      // common cases
+      case error.keyword === 'type':
+        if (error.params.type === 'integer') {
+          message = `${String(data)} must be a number`;
+        } else if (Array.isArray(error.params.type) && error.params.type.toString() === 'integer,null')
+          message = `${String(data)} must be a number or empty`;
+        else if (error.params.type === 'number') message = `${String(data)} must be a number`;
+        else if (Array.isArray(error.params.type) && error.params.type.toString() === 'number,null')
+          message = `${String(data)} must be a number or empty`;
+        else message = ' ' + error.message;
+        break;
+      case error.keyword === 'enum':
+        message = `${String(data)} must be from list [${error.params.allowedValues}]`;
+        break;
+      case error.keyword === 'regexp':
+        message = `${String(data)} must match the pattern ${new RegExp(
+          error.parentSchema?.regexp?.pattern,
+          error.parentSchema?.regexp?.flags || ''
+        ).toString()}`;
+        break;
+      case error.keyword === 'pattern':
+        message = `${String(data)} must match the pattern of ${error.params.pattern}`;
+        break;
+      case error.keyword === 'format':
+        message = `${String(data)} must be a valid ${error.params.format}`;
+        break;
+      case !!uniqueCombinations[error.keyword]:
+        message =
+          validationErrorMessages?.[field]?.[ValidationTypesEnum.UNIQUE_WITH] ||
+          `Value should be unique for combination of ${uniqueCombinations[error.keyword].toString()}`;
+        break;
+      default:
+        message = ` contains invalid data`;
+        break;
+    }
+
+    return message;
+  }
+
+  private async executeBatchInSandbox(batchItem: IBatchItem, sandboxManager: SManager, onBatchInitialize: string) {
+    let sandbox: Awaited<ReturnType<SManager['obtainSandbox']>> | undefined;
+    try {
+      sandbox = await sandboxManager.obtainSandbox(batchItem.uploadId);
+      await sandbox.clean();
+      const sandboxPath = sandbox.getSandboxFolderPath();
+
+      if (!fs.existsSync(sandboxPath)) {
+        await sandbox.init();
+      }
+
+      fs.writeFileSync(
+        `${sandboxPath}/input.json`,
+        JSON.stringify({
+          ...batchItem,
+          sandboxPath: sandboxPath,
+          chunkSize: BATCH_LIMIT,
+        })
+      );
+      fs.writeFileSync(`${sandboxPath}/code.js`, onBatchInitialize);
+      fs.writeFileSync(`${sandboxPath}/main.js`, MAIN_CODE);
+
+      const nodeExecutablePath = process.execPath;
+
+      return await sandbox.runCommandLine(`${nodeExecutablePath} main.js`);
+    } catch (error) {
+      throw new Error(error.message);
+    } finally {
+      if (sandbox) {
+        await sandboxManager.returnSandbox(sandbox.boxId);
+      }
+    }
+  }
+  formatRecord({
+    record,
+    headings,
+    numberColumnHeadings,
+    multiSelectColumnHeadings,
+  }: {
+    headings: string[];
+    record: Record<string, any>;
+    numberColumnHeadings: Set<string>;
+    multiSelectColumnHeadings: Record<string, string>;
+  }) {
+    return headings.reduce(
+      (acc, heading, index) => {
+        if (heading === '_') return acc;
+        let val = record[index];
+
+        if (numberColumnHeadings.has(heading)) val = val !== '' && !isNaN(val) ? Number(val) : val;
+        if (typeof val === 'string') val = val.trim();
+        if (multiSelectColumnHeadings[heading]) {
+          const delimiter = multiSelectColumnHeadings[heading];
+          const regex = this.getMultiSelectRegex(delimiter);
+          if (val) val = val.replace(regex.trim, '').replace(regex.dedupe, delimiter);
+          acc.checkRecord[heading] = !val ? [] : val.split(delimiter);
+        } else acc.checkRecord[heading] = val;
+
+        acc.passRecord[heading] = val;
+
+        return acc;
+      },
+      {
+        checkRecord: {},
+        passRecord: {},
+      }
+    );
+  }
+  async normalRun({
+    csvFileStream,
+    validator,
+    uploadId,
+    headings,
+    dateFormats,
+    dataStream,
+    headerRow,
+    uniqueCombinations,
+    numberColumnHeadings,
+    validationErrorMessages,
+    multiSelectColumnHeadings,
+  }: IRunData): Promise<ISaveResults> {
+    return new Promise(async (resolve, reject) => {
+      let totalRecords = -1,
+        invalidRecords = 0,
+        validRecords = 0;
+      Papa.parse(csvFileStream, {
+        dynamicTyping: false,
+        skipEmptyLines: 'greedy',
+        step: (results: Papa.ParseStepResult<any>, parser: any) => {
+          totalRecords++;
+          const record = results.data;
+
+          if (totalRecords > headerRow) {
+            const recordObj: {
+              checkRecord: Record<string, unknown>;
+              passRecord: Record<string, unknown>;
+            } = this.formatRecord({ headings, multiSelectColumnHeadings, record, numberColumnHeadings });
+            const validationResultItem = this.validateRecord({
+              index: totalRecords,
+              checkRecord: recordObj.checkRecord,
+              passRecord: recordObj.passRecord,
+              validator,
+              dateFormats,
+              uniqueCombinations,
+              validationErrorMessages,
+            });
+            if (validationResultItem.isValid) {
+              validRecords++;
+            } else {
+              invalidRecords++;
+            }
+            const canContinue = dataStream.write(validationResultItem);
+            if (!canContinue) {
+              parser.pause();
+              dataStream.once('drain', () => parser.resume());
+            }
+          }
+        },
+        complete: async () => {
+          dataStream.end();
+          resolve({
+            uploadId,
+            invalidRecords,
+            totalRecords,
+            validRecords,
+          });
+        },
+        error: (err) => {
+          reject(err);
+        },
+      });
+    });
+  }
+
+  validateRecord({
+    index,
+    passRecord,
+    checkRecord,
+    validator,
+    dateFormats,
+    uniqueCombinations,
+    validationErrorMessages,
+    updated,
+  }: {
+    index: number;
+    validator: ValidateFunction;
+    passRecord: Record<string, any>;
+    checkRecord: Record<string, any>;
+    dateFormats: Record<string, string[]>;
+    uniqueCombinations: Record<string, string[]>;
+    validationErrorMessages?: Record<string, { string: Record<string, string> }>;
+    updated?: Record<string, boolean>;
+  }) {
+    const propertyUpdated = updated || {};
+    const isValid = validator(checkRecord, {
+      instancePath: `/${index}`,
+      parentData: undefined,
+      parentDataProperty: '',
+      rootData: [],
+      dynamicAnchors: undefined,
+    });
+    if (!isValid) {
+      const errors = this.getErrorsObject(validator.errors, dateFormats, validationErrorMessages, uniqueCombinations);
+
+      return {
+        index,
+        errors: errors,
+        isValid: false,
+        record: passRecord,
+        updated: propertyUpdated,
+      };
+    } else {
+      return {
+        index,
+        isValid: true,
+        record: passRecord,
+        errors: {},
+        updated: propertyUpdated,
+      };
+    }
+  }
+
+  getAjvValidator(
+    dateFormats: Record<string, string[]>,
+    uniqueItems: Record<string, Set<any>>,
+    uniqueCombinations: Record<string, string[]>
+  ) {
+    const ajv = new Ajv({
+      allErrors: true,
+      coerceTypes: true,
+      useDefaults: 'empty',
+      allowUnionTypes: true,
+      // removeAdditional: true,
+      verbose: true,
+    });
+    addFormats(ajv, ['email']);
+    addKeywords(ajv);
+
+    // Empty keyword
+    ajv.addKeyword({
+      keyword: 'emptyCheck',
+      schema: false,
+      compile: () => {
+        return (data) =>
+          data === undefined || data === null || data === '' || (Array.isArray(data) && data.length === 0)
+            ? false
+            : true;
+      },
+    });
+
+    ajv.addKeyword('customDateChecker', {
+      keyword: 'customDateChecker',
+      validate: function (_valid, date, _schema, dataPath) {
+        if (date === null) return true;
+
+        return dayjs(date, [...dateFormats[dataPath.parentDataProperty]], true).isValid();
+      },
+    });
+
+    ajv.addKeyword({
+      keyword: 'uniqueCheck',
+      schema: false, // keyword value is not used, can be true
+      validate: function (data: any, dataPath: AnySchemaObject) {
+        if (!data) return true;
+        if (uniqueItems[dataPath.parentDataProperty].has(data)) {
+          return false;
+        }
+        uniqueItems[dataPath.parentDataProperty].add(data);
+
+        return true;
+      },
+    });
+
+    ajv.addKeyword({
+      keyword: 'digitCount',
+      type: 'number',
+      schemaType: 'object',
+      // schema = { min: number, max: number }
+      validate: (schema: { min?: number; max?: number }, data: number) => {
+        if (data === null || data === undefined) return true;
+
+        // Count digits (ignore sign and decimal part)
+        const digits = Math.floor(Math.log10(Math.abs(data))) + 1;
+
+        if (schema.min !== undefined && digits < schema.min) return false;
+        if (schema.max !== undefined && digits > schema.max) return false;
+
+        return true;
+      },
+      errors: true,
+    });
+
+    const valuesMap = new Map();
+    Object.keys(uniqueCombinations).forEach((keyword) => {
+      valuesMap.set(keyword, new Set());
+      ajv.addKeyword({
+        keyword,
+        type: 'object',
+        validate: function (schema, data) {
+          const fields = uniqueCombinations[keyword];
+
+          const fullName = fields.map((field) => `${data[field]}`).join(', ');
+          if (valuesMap.get(keyword).has(fullName)) {
+            return false;
+          }
+          valuesMap.get(keyword).add(fullName);
+
+          return true;
+        },
+      });
+    });
+
+    return ajv;
+  }
+
+  getUniqueKey(uniqueKey: string) {
+    return 'unique' + uniqueKey.replace(/\s+/g, '');
+  }
+
+  async batchRun({
+    headings,
+    validator,
+    uploadId,
+    extra,
+    headerRow,
+    dateFormats,
+    csvFileStream,
+    uniqueCombinations,
+    numberColumnHeadings,
+    validationErrorMessages,
+    multiSelectColumnHeadings,
+  }: IRunData): Promise<IBatchItem[]> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        let recordsCount = -1,
+          batchCount = 1;
+        const batches: IBatchItem[] = [];
+        const batchRecords: IDataItem[] = [];
+
+        Papa.parse(csvFileStream, {
+          dynamicTyping: false,
+          skipEmptyLines: 'greedy',
+          step: (results: Papa.ParseStepResult<any>) => {
+            recordsCount++;
+            const record = results.data;
+            if (recordsCount > headerRow) {
+              const recordObj: {
+                checkRecord: Record<string, unknown>;
+                passRecord: Record<string, unknown>;
+              } = this.formatRecord({ headings, multiSelectColumnHeadings, record, numberColumnHeadings });
+              const validationResultItem = this.validateRecord({
+                index: recordsCount,
+                checkRecord: recordObj.checkRecord,
+                passRecord: recordObj.passRecord,
+                validator,
+                dateFormats,
+                uniqueCombinations,
+                validationErrorMessages,
+              });
+              batchRecords.push(validationResultItem);
+              if (batchRecords.length === BATCH_LIMIT) {
+                batches.push({
+                  uploadId,
+                  data: [...batchRecords],
+                  batchCount,
+                  extra,
+                });
+                batchRecords.length = 0;
+                batchCount++;
+              }
+            }
+          },
+          complete() {
+            if (batchRecords.length > 0) {
+              batches.push({
+                uploadId,
+                data: batchRecords,
+                batchCount,
+                extra,
+              });
+            }
+            resolve(batches);
+          },
+          error: (err) => {
+            reject(err);
+          },
+        });
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  async processBatches({
+    batches,
+    forItem,
+    onError,
+    dataStream,
+    onBatchInitialize,
+  }: {
+    uploadId: string;
+    dataStream: Writable;
+    batches: IBatchItem[];
+    onBatchInitialize: string;
+    onError?: (error: ExecuteIsolateResult) => void;
+    forItem?: (item: any) => void;
+  }): Promise<void> {
+    return new Promise(async (resolve) => {
+      const concurrency = this.getBatchConcurrency();
+      let batchCursor = 0;
+
+      const runWorker = async () => {
+        while (true) {
+          const currentIndex = batchCursor++;
+          const batch = batches[currentIndex];
+          if (!batch) return;
+
+          const processData = await this.executeBatchInSandbox(batch, this.sandboxManager, onBatchInitialize);
+
+          if (
+            processData &&
+            processData.output &&
+            typeof (processData.output as any)?.output === 'object' &&
+            !Array.isArray((processData.output as any)?.output)
+          ) {
+            const processOutput: {
+              uploadId: string;
+              data: any[];
+              batchCount: number;
+              sandboxPath: string;
+              chunkSize: number;
+            } = (processData.output as unknown as any).output;
+
+            for (const item of processOutput.data) {
+              await this.writeToStream(dataStream, item);
+              forItem?.(item);
+            }
+          } else {
+            console.log(processData);
+            onError?.(processData);
+          }
+        }
+      };
+
+      const workerCount = Math.min(concurrency, Math.max(1, batches.length));
+      const workers = Array.from({ length: workerCount }, () => runWorker());
+      await Promise.all(workers);
+
+      if (!dataStream.writableEnded) {
+        dataStream.end();
+      }
+      resolve();
+    });
+  }
+}
