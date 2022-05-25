@@ -1,0 +1,93 @@
+import { ApiTags, ApiOperation, ApiSecurity } from '@nestjs/swagger';
+import { Controller, Param, UseGuards, Get, Query, Post, Logger } from '@nestjs/common';
+import { ValidateMongoId } from '@shared/validations/valid-mongo-id.validation';
+
+import { UploadSummary, UploadHistory, RetryUpload, WebhookLogs } from './usecases';
+import { ACCESS_KEY_NAME, Defaults } from '@importflow/shared';
+import { JwtAuthGuard } from '@shared/framework/auth.guard';
+import { isDateString } from '@shared/helpers/common.helper';
+
+@Controller('/activity')
+@ApiTags('Activity')
+@UseGuards(JwtAuthGuard)
+@ApiSecurity(ACCESS_KEY_NAME)
+export class ActivityController {
+  private readonly logger = new Logger(ActivityController.name);
+
+  constructor(
+    private uploadSummary: UploadSummary,
+    private uploadHistory: UploadHistory,
+    private retryUpload: RetryUpload,
+    private webhookLogs: WebhookLogs
+  ) {}
+
+  @Get(':projectId/summary')
+  @ApiOperation({
+    summary: 'Get project upload summary',
+  })
+  async getUploadSummaryRoute(@Param('projectId', ValidateMongoId) _columnId: string) {
+    return this.uploadSummary.execute(_columnId);
+  }
+
+  @Get(':projectId/history')
+  @ApiOperation({
+    summary: 'Get project upload history',
+  })
+  async getUploadHistoryRoute(
+    @Param('projectId', ValidateMongoId) _projectId: string,
+    @Query('name') name?: string,
+    @Query('page') page = Defaults.ONE,
+    @Query('limit') limit = Defaults.PAGE_LIMIT,
+    @Query('date') date?: string
+  ) {
+    if (isNaN(page)) page = Defaults.ONE;
+    else page = Number(page);
+    if (isNaN(limit)) limit = Defaults.PAGE_LIMIT;
+    else limit = Number(limit);
+    if (!isDateString(date)) {
+      date = undefined;
+    }
+
+    const input = { _projectId, name, date, page, limit };
+    this.logger.log(`[getUploadHistoryRoute] INPUT: ${JSON.stringify(input)}`);
+
+    const result = await this.uploadHistory.execute(input);
+
+    this.logger.log(
+      `[getUploadHistoryRoute] OUTPUT: totalRecords=${result.totalRecords}, totalPages=${result.totalPages}, page=${result.page}, limit=${result.limit}, dataCount=${result.data?.length}`
+    );
+
+    return result;
+  }
+
+  @Post(':uploadId/retry')
+  @ApiOperation({
+    summary: 'Retry webhook data for a specific upload',
+  })
+  async retryUploadRoute(@Param('uploadId', ValidateMongoId) uploadId: string) {
+    return this.retryUpload.execute(uploadId);
+  }
+
+  @Get('upload/:uploadId/webhook-logs')
+  @ApiOperation({
+    summary: 'Get webhook logs for a specific upload',
+  })
+  async getWebhookLogsRoute(
+    @Param('uploadId', ValidateMongoId) uploadId: string,
+    @Query('page') page = Defaults.ONE,
+    @Query('limit') limit = Defaults.PAGE_LIMIT,
+    @Query('isRetry') isRetry?: boolean
+  ) {
+    if (isNaN(page)) page = Defaults.ONE;
+    else page = Number(page);
+    if (isNaN(limit)) limit = Defaults.PAGE_LIMIT;
+    else limit = Number(limit);
+
+    return this.webhookLogs.execute({
+      uploadId,
+      page,
+      limit,
+      isRetry,
+    });
+  }
+}
