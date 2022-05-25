@@ -1,0 +1,28 @@
+import { Injectable } from '@nestjs/common';
+import { QueueService } from '@shared/services/queue.service';
+import { QueuesEnum, UserJobImportStatusEnum } from '@importflow/shared';
+import { UserJobRepository } from '@importflow/dal';
+@Injectable()
+export class UserJobTriggerService {
+  constructor(
+    private readonly queueService: QueueService,
+    private readonly userJobRepository: UserJobRepository
+  ) {}
+
+  async execute(_jobId: string) {
+    if (_jobId) {
+      console.log('Triggering job', _jobId);
+      const updatedJob = await this.userJobRepository.findOneAndUpdate(
+        { _id: _jobId },
+        {
+          $set: { status: UserJobImportStatusEnum.RUNNING },
+        },
+        { new: true }
+      );
+
+      if (updatedJob) {
+        this.queueService.publishToQueue(QueuesEnum.GET_IMPORT_JOB_DATA, { _jobId });
+      }
+    }
+  }
+}
