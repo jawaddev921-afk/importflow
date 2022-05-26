@@ -1,0 +1,105 @@
+import { randomBytes } from 'crypto';
+import { Injectable, BadRequestException } from '@nestjs/common';
+import { EmailService, PaymentAPIService } from '@importflow/services';
+import { BILLABLEMETRIC_CODE_ENUM, EMAIL_SUBJECT } from '@importflow/shared';
+import { ProjectInvitationRepository, EnvironmentRepository } from '@importflow/dal';
+
+import { InviteCommand } from './invite.command';
+
+@Injectable()
+export class Invite {
+  constructor(
+    private emailService: EmailService,
+    private projectInvitationRepository: ProjectInvitationRepository,
+    private environmentRepository: EnvironmentRepository,
+    private paymentAPIService: PaymentAPIService
+  ) {}
+
+  async exec(command: InviteCommand) {
+    try {
+      /*
+       * const subscription = await this.paymentAPIService.fetchActiveSubscription(command.invitedBy);
+       * const allocated = subscription.meta.TEAM_MEMBERS;
+       */
+
+      const existingInvitationsCount = await this.projectInvitationRepository.count({
+        _projectId: command.projectId,
+        invitedBy: command.invitatedBy,
+      });
+
+      const totalInvitationsCount = existingInvitationsCount + command.invitationEmailsTo.length;
+      if (totalInvitationsCount > 4) {
+        throw new BadRequestException(
+          'You cannot invite more than 4 emails at a time, including already sent invitations.'
+        );
+      }
+
+      // Fetch team members and existing invitations in parallel
+      const [teamMembers, existingInvitations] = await Promise.all([
+        this.environmentRepository.getProjectTeamMembers(command.projectId),
+        this.projectInvitationRepository.find({
+          invitationToEmail: { $in: command.invitationEmailsTo },
+          _projectId: command.projectId,
+        }),
+      ]);
+
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      const memberEmails = new Set(teamMembers.map((teamMember) => teamMember._userId.email));
+      const alreadyInvitedEmails = new Set(existingInvitations.map((inv) => inv.invitationToEmail));
+
+      // Validate all emails upfront before any writes
+      for (const invitationEmailTo of command.invitationEmailsTo) {
+        if (memberEmails.has(invitationEmailTo)) {
+          throw new BadRequestException(`The email ${invitationEmailTo} is already a member of the project.`);
+        }
+        if (alreadyInvitedEmails.has(invitationEmailTo)) {
+          throw new BadRequestException(`The email ${invitationEmailTo} has already been invited.`);
+        }
+      }
+
+      // Create all invitations in parallel, then send emails + payment events in parallel
+      const invitations = await Promise.all(
+        command.invitationEmailsTo.map((invitationEmailTo) =>
+          this.projectInvitationRepository.create({
+            invitationToEmail: invitationEmailTo,
+            invitedOn: new Date().toDateString(),
+            role: command.role,
+            invitedBy: command.invitatedBy,
+            _projectId: command.projectId,
+            token: randomBytes(16).toString('hex'),
+          })
+        )
+      );
+
+      await Promise.allSettled(
+        invitations.map(async (invitation) => {
+          const emailContents = this.emailService.getEmailContent({
+            type: 'TEAM_INVITATION_EMAIL',
+            data: {
+              invitedBy: command.invitatedBy,
+              projectName: command.projectName,
+              invitationUrl: `${process.env.WEB_BASE_URL}/auth/invitation/${invitation._id}`,
+            },
+          });
+          const sentEmail = await this.emailService.sendEmail({
+            to: invitation.invitationToEmail,
+            subject: `${EMAIL_SUBJECT.PROJECT_INVITATION} ${command.projectName}`,
+            html: emailContents,
+            from: process.env.EMAIL_FROM,
+            senderName: process.env.EMAIL_FROM_NAME,
+          });
+
+          if (sentEmail) {
+            await this.paymentAPIService.createEvent(
+              { units: 1, billableMetricCode: BILLABLEMETRIC_CODE_ENUM.TEAM_MEMBERS },
+              command.invitatedBy
+            );
+          }
+        })
+      );
+    } catch (error) {
+      throw new BadRequestException(error);
+    }
+  }
+}
