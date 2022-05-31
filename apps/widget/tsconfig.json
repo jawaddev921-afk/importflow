@@ -1,0 +1,40 @@
+{
+  "compilerOptions": {
+    "target": "es5",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "downlevelIteration": true,
+    "noImplicitAny": false,
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "baseUrl": "src",
+    "paths": {
+      "@api": ["util/api/index.ts"],
+      "@store/*": ["store/*"],
+      "@config": ["config/index.ts"],
+      "@ui/*": ["design-system/*"],
+      "@types": ["types/index.ts"],
+      "@icons": ["icons/index.ts"],
+      "@util": ["util/index.ts"],
+      "@hooks/*": ["hooks/*"],
+      "@amplitude": ["util/amplitude/index.ts"],
+    }
+  },
+  "include": [
+    "src", "public"
+  ]
+}
