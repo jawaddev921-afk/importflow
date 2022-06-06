@@ -1,0 +1,263 @@
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { useMutation, useQuery } from '@tanstack/react-query';
+
+import { logAmplitudeEvent } from '@amplitude';
+import { deepCompareObjects, notifier, ParentWindow } from '@util';
+import { useAPIState } from '@store/api.context';
+import { useAppState } from '@store/app.context';
+import { useImportFlowState } from '@store/importflow.context';
+import { IUpload, WIDGET_TEXTS } from '@importflow/client';
+import {
+  IErrorObject,
+  ITemplate,
+  FileMimeTypesEnum,
+  IColumn,
+  downloadFile,
+  DEFAULT_WIDGET_TEXTS,
+  defaultWidgetAppereance,
+} from '@importflow/shared';
+
+import { variables, WIDGET_FEATURES_EXCEPTION_MESSAGES } from '@config';
+import { useSample } from '@hooks/useSample';
+import { useTemplates } from '@hooks/useTemplates';
+import { IFormvalues, IUploadValues } from '@types';
+
+interface IUsePhase1Props {
+  goNext: () => void;
+  texts: typeof WIDGET_TEXTS;
+  onManuallyEnterData: () => void;
+}
+
+export function usePhase1({ goNext, texts, onManuallyEnterData }: IUsePhase1Props) {
+  const {
+    watch,
+    control,
+    register,
+    trigger,
+    setValue,
+    setError,
+    getValues,
+    resetField,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<IFormvalues>();
+  const { api } = useAPIState();
+  const { templates } = useTemplates();
+  const { getSignedUrl, onDownload } = useSample({});
+  const { templateId, authHeaderValue, extra } = useImportFlowState();
+  const [excelSheetNames, setExcelSheetNames] = useState<string[]>([]);
+  const [isDownloadInProgress, setIsDownloadInProgress] = useState<boolean>(false);
+
+  const {
+    setUploadInfo,
+    setTemplateInfo,
+    output,
+    schema,
+    data,
+    importId,
+    imageSchema,
+    sampleFile,
+    config,
+    maxRecords,
+    importConfig,
+    appearance,
+  } = useAppState();
+
+  const selectedTemplateId = watch('templateId');
+
+  const { data: columns, isLoading: isColumnListLoading } = useQuery<unknown, IErrorObject, IColumn[], [string]>(
+    [`template-columns:${selectedTemplateId}`],
+    () => api.getTemplateColun(selectedTemplateId),
+    {
+      enabled: !!selectedTemplateId,
+    }
+  );
+
+  const { isLoading: isUploadLoading, mutate: submitUpload } = useMutation<IUpload, IErrorObject, IUploadValues>(
+    ['upload'],
+    (values: IUploadValues) => {
+      try {
+        const textCustomizationResult = deepCompareObjects(DEFAULT_WIDGET_TEXTS, texts);
+        const appearanceCustomizationResult = deepCompareObjects(defaultWidgetAppereance, appearance);
+
+        if (maxRecords && !importConfig?.MAX_RECORDS) {
+          throw new Error(WIDGET_FEATURES_EXCEPTION_MESSAGES.MAX_RECORDS);
+        }
+
+        if (!importConfig.TEXT_CUSTOMIZATION && textCustomizationResult.differences.length > 0) {
+          throw new Error(WIDGET_FEATURES_EXCEPTION_MESSAGES.TEXT_CUSTOMIZATION);
+        }
+
+        if (
+          !importConfig.APPEARANCE_CUSTOMIZATION &&
+          appearance &&
+          appearanceCustomizationResult.differences.length > 0
+        ) {
+          throw new Error(WIDGET_FEATURES_EXCEPTION_MESSAGES.APPEARANCE_CUSTOMIZATION);
+        }
+
+        /*
+         * if (schema && !importConfig.RUNTIME_SCHEMA) {
+         *   throw new Error(`Your current plan does not support providing runtime schema`);
+         * }
+         */
+      } catch (error) {
+        throw error;
+      }
+
+      return api.uploadFile(values);
+    },
+    {
+      onSuccess(uploadData, uploadValues) {
+        ParentWindow.UploadStarted({ templateId: uploadData._templateId, uploadId: uploadData._id });
+        ParentWindow.UploadSuccess({ uploadId: uploadData._id, rowCount: uploadData.totalRecords });
+        ParentWindow.UploadStatusSuccess({ uploadId: uploadData._id, rowCount: uploadData.totalRecords });
+        setUploadInfo(uploadData);
+        if (uploadValues.file) goNext();
+        else onManuallyEnterData();
+      },
+      onError(error: IErrorObject) {
+        ParentWindow.UploadError({
+          errorCode: error.statusCode || 500,
+          errorMessage: error.message || 'Unknown Error',
+        });
+        ParentWindow.UploadStatusError(error);
+        resetField('file');
+        setError('file', {
+          type: 'file',
+          message: error.message,
+        });
+      },
+    }
+  );
+
+  const { mutate: getExcelSheetNames, isLoading: isExcelSheetNamesLoading } = useMutation<
+    string[],
+    IErrorObject,
+    { file: File }
+  >(['getExcelSheetNames'], (excelSheetFile) => api.getExcelSheetNames(excelSheetFile), {
+    onSuccess(sheetNames) {
+      if (sheetNames.length <= 1) {
+        setValue('selectedSheetName', sheetNames[0]);
+        handleSubmit(uploadFile)();
+      } else setExcelSheetNames(sheetNames);
+    },
+    onError(error: IErrorObject) {
+      notifier.showError({ title: error.error, message: error.message });
+    },
+  });
+
+  const findTemplate = (): ITemplate | undefined => {
+    let foundTemplate: ITemplate | undefined;
+    const selectedTemplateValue = getValues('templateId');
+    if (selectedTemplateValue && templates) {
+      foundTemplate = templates.find((templateItem) => templateItem._id === selectedTemplateValue);
+    }
+    if (!foundTemplate) notifier.showError({ title: texts.COMMON.SORRY, message: texts.PHASE1.TEMPLATE_NOT_FOUND_MSG });
+    else if (foundTemplate.totalColumns === variables.baseIndex)
+      notifier.showError({ title: texts.COMMON.SORRY, message: texts.PHASE1.INCOMPLETE_TEMPLATE_MSG });
+    else return foundTemplate;
+
+    return undefined;
+  };
+  const onTemplateChange = (newTemplateId: string | null) => {
+    const foundTemplate = templates?.find((templateItem) => templateItem._id === newTemplateId);
+    if (foundTemplate && newTemplateId) {
+      setTemplateInfo(foundTemplate);
+      setValue('templateId', newTemplateId);
+      trigger('templateId');
+    }
+  };
+  const onDownloadClick = async () => {
+    if (sampleFile) {
+      const fileName = (sampleFile as File).name;
+      const fileBaseName = fileName.split('.')[0];
+      downloadFile(sampleFile as Blob, fileBaseName);
+    }
+
+    setIsDownloadInProgress(true);
+    const isTemplateValid = await trigger('templateId');
+    if (!isTemplateValid) {
+      setIsDownloadInProgress(false);
+
+      return;
+    }
+
+    const foundTemplate = findTemplate();
+    if (foundTemplate && (data || schema)) {
+      onDownload({ template: foundTemplate });
+    } else if (foundTemplate && foundTemplate.sampleFileUrl) {
+      getSignedUrl([
+        foundTemplate.sampleFileUrl,
+        foundTemplate.name + ` (sample).${foundTemplate.sampleFileUrl.substr(-4, 4)}`,
+      ]);
+    }
+    setIsDownloadInProgress(false);
+  };
+  const uploadFile = async (submitData: IFormvalues) => {
+    setExcelSheetNames([]);
+    const foundTemplate = findTemplate();
+    if (foundTemplate) {
+      submitData.templateId = foundTemplate._id;
+      logAmplitudeEvent('UPLOAD', {
+        fileSize: submitData.file?.size,
+        fileType: submitData.file?.type,
+        hasData: !!data,
+        hasExtra: !!extra,
+      });
+      submitUpload({
+        ...submitData,
+        authHeaderValue,
+        extra,
+        schema,
+        output,
+        importId,
+        imageSchema,
+        maxRecords,
+      });
+    }
+  };
+  const onSubmit = async (uploadedFile?: File) => {
+    if (
+      uploadedFile &&
+      [FileMimeTypesEnum.EXCEL, FileMimeTypesEnum.EXCELX].includes(uploadedFile.type as FileMimeTypesEnum)
+    ) {
+      getExcelSheetNames({ file: uploadedFile });
+    } else {
+      handleSubmit(uploadFile)();
+    }
+  };
+  const onSelectSheetModalReset = () => {
+    setExcelSheetNames([]);
+  };
+
+  useEffect(() => {
+    if (templateId) {
+      setValue('templateId', templateId);
+    }
+  }, [templateId]);
+
+  return {
+    errors,
+    control,
+    columns,
+    setError,
+    register,
+    onSubmit,
+    templates,
+    onDownloadClick,
+    excelSheetNames,
+    isUploadLoading,
+    onTemplateChange,
+    isColumnListLoading,
+    isDownloadInProgress,
+    onSelectSheetModalReset,
+    isExcelSheetNamesLoading,
+    showSelectTemplate: !templateId,
+    onSelectExcelSheet: handleSubmit(uploadFile),
+    isManualDataEntryAvailable: importConfig.MANUAL_ENTRY,
+    hideDownloadSampleButton: config?.hideDownloadSampleButton,
+    isDownloadFileAvailable: importConfig?.DOWNLOAD_SAMPLE_FILE,
+  };
+}
