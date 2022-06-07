@@ -1,0 +1,423 @@
+/* Handsontable base styling with theme integration */
+.handsontable {
+    background-color: var(--background-color) !important;
+    color: var(--text-color) !important;
+}
+.handsontable td {
+    overflow: unset !important;
+    border-color: var(--border-color) !important;
+    background-color: var(--background-color) !important;
+        color: var(--text-color) !important;
+}
+
+.handsontable th {
+    background-color: '#f1f3f5';
+        background-color: var(--background-color) !important;
+        border-color: var(--border-color) !important;
+        background-color: #ffcccc;
+        
+}
+
+.htCore thead tr th {
+    padding: 0.3rem !important;
+    vertical-align: middle !important;
+background-color: '#f1f3f5';
+    color: var(--text-color) !important;
+}
+
+.custom-cell {
+    text-align: center;
+    vertical-align: middle !important;
+    padding: 5px !important;
+    background-color: white !important;
+}
+
+.cell-value {
+    max-width: 70%;
+    display: inline-block;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    color: var(--text-color) !important;
+}
+.index-cell {
+    text-align: center;
+    vertical-align: middle !important;
+    background-color: var(--background-color) !important;
+        color: var(--text-color) !important;
+    padding: 5px !important;
+}
+.check-box {
+    margin: 0 auto;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.check-cell {
+    height: 24px !important;
+    cursor: pointer;
+    text-align: center;
+    padding: 0.5rem !important;
+    background-color: var(--background-color) !important;
+}
+
+.check-cell .check-box {
+    width: 15px;
+    height: 15px;
+}
+
+.check-all-cell {
+    cursor: pointer;
+    text-align: center;
+    padding: 0.3rem !important;
+    background-color: var(--background-color) !important;
+}
+
+.check-all-cell .check-box {
+    width: 15px;
+    height: 15px;
+    background-color: var(--background-color) !important;
+}
+.checkbox {
+    display: inline-flex;
+    position: relative;
+    vertical-align: middle;
+}
+
+.checkbox__control {
+    -webkit-appearance: none;
+    appearance: none;
+    z-index: 1;
+    border: 0.5px solid var(--button-primary-background);
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    cursor: pointer;
+    background-color: var(--button-primary-background);
+}
+
+.checkbox__control-icon {
+    position: absolute;
+    width: 15px;
+    height: 15px;
+    transition: opacity 400ms ease-in-out;
+    opacity: 0;
+    z-index: 2;
+    color: var(--button-primary-color);
+        border-radius: var(--border-radius);
+}
+
+.checkbox__control:checked+.checkbox__control-icon {
+    opacity: 1;
+}
+
+.list-wrapper {
+    width: auto;
+    box-shadow: 0 0 0 1px var(--border-color);
+        background-color: var(--background-color);
+    visibility: hidden;
+    z-index: 300;
+    position: absolute;
+    border: 1px solid var(--border-color);
+}
+
+.list-wrapper.open {
+    visibility: visible;
+    position: absolute;
+    width: auto;
+    min-width: fit-content;
+    max-width: 100%;
+    z-index: 300;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--border-color);
+        background: var(--background-color);
+    overflow: hidden;
+    box-sizing: border-box;
+    top: 100%;
+    left: 0;
+    margin: 0;
+}
+
+.list-wrapper ul {
+    position: fixed;
+    height: 180px;
+    width: 191px;
+    background: var(--background-color);
+    overflow: auto;
+    margin-bottom: -20px;
+    border: 1px solid var(--border-color);
+}
+
+.list-wrapper.open ul {
+    width: 100%;
+    max-width: none;
+    height: auto;
+    max-height: 50vh;
+    overflow-y: auto;
+    margin: 0;
+    padding: 0;
+    border: none;
+    position: relative;
+    background: var(--background-color);
+}
+
+.list-wrapper:hover .option:not(:hover) {
+    background-color: transparent !important;
+}
+
+.list-dropdown {
+    max-height: 250px;
+    overflow: auto;
+    z-index: 999;
+    top: 100%;
+    left: 0;
+    border: 1px solid var(--border-color);
+    width: 100%;
+    background: var(--background-color);
+}
+
+.dd-searchbox {
+    padding: 0.5rem;
+    background-color: var(--background-color);
+        color: var(--text-color);
+        border: 1px solid var(--border-color);
+    outline: none;
+    width: 100%;
+    min-width: min-content;
+    max-width: 100%;
+    box-sizing: border-box;
+    text-overflow: ellipsis;
+    border-radius: var(--border-radius);
+    }
+    
+    .dd-searchbox:focus {
+        border-color: var(--button-primary-background);
+}
+
+.option {
+    cursor: pointer;
+    outline: none;
+    padding: 0.5rem;
+    list-style: none;
+    width: 100%;
+    background-color: var(--background-color);
+        color: var(--text-color);
+        transition: background-color 0.2s ease;
+}
+
+.option:hover,
+.option:focus {
+    background-color: var(--table-hover-background) !important;
+        color: var(--text-color) !important;
+}
+
+.option.selected {
+    overflow: hidden;
+    width: 100%;
+    font-weight: 600;
+    background-color: var(--stepper-background) !important;
+        color: var(--text-color);
+    }
+    
+    .option.highlighted {
+        background-color: var(--table-hover-background) !important;
+        color: var(--text-color) !important;
+    }
+.input-wrapper {
+    width: inherit;
+    display: flex;
+    flex-wrap: wrap;
+    padding: 3px;
+    gap: 2px;
+    max-width: fit-content;
+    box-sizing: border-box;
+    position: relative;
+    background-color: var(--background-color);
+}
+
+.item {
+    display: flex;
+    cursor: pointer;
+    align-items: center;
+    border-radius: var(--border-radius);
+    padding: 0.0225rem 0.15rem;
+    background-color: var(--stepper-background);
+        border: 1px solid var(--border-color);
+        color: var(--text-color);
+        transition: all 0.2s ease;
+    }
+    
+    .item:hover {
+        background-color: var(--table-hover-background);
+    }
+.item svg {
+    height: 20px;
+    width: 20px;
+    transition: color 400ms ease-in-out;
+}
+
+.item:hover svg {
+    color: red;
+}
+
+.items {
+    gap: 2px;
+    display: flex;
+    flex-wrap: wrap;
+}
+/* Additional Handsontable specific overrides */
+.handsontable .htCore {
+    border-bottom: 1px solid var(--border-color) !important;
+    background-color: var(--background-color) !important;
+}
+
+.handsontable .htCore .htInvalid,
+.handsontable .htCore .error-cell,
+.handsontable td.htInvalid,
+.handsontable td.error-cell,
+.handsontable td.custom-cell.error-cell {
+    background-color: #fdebeb !important;
+    color: #c62828 !important;
+}
+
+.handsontable .htCore .htWarning,
+.handsontable .htCore .warning-cell,
+.handsontable td.htWarning,
+.handsontable td.warning-cell,
+.handsontable td.custom-cell.warning-cell {
+    background-color: #fff3e0 !important;
+    color: #ef6c00 !important;
+    border: 1px solid #ff9800 !important;
+}
+
+.handsontable .htCore .htSelected {
+    background-color: var(--button-primary-background) !important;
+    color: var(--button-primary-color) !important;
+}
+
+.handsontable .htCore .htCurrentCell {
+    border: 2px solid var(--button-primary-background) !important;
+}
+
+.handsontable .custom-cell.error-cell {
+    background-color: #ffebeb !important;
+    color: var(--text-color) !important;
+}
+
+.handsontable .custom-cell.warning-cell {
+    background-color: #ffda6b !important;
+    color: var(--text-color) !important;
+    border: 1px solid #ffc107 !important;
+}
+
+.handsontable .custom-cell.updated-cell {
+    background-color: #ffda6b !important;
+}
+
+.handsontable .custom-cell.updated-cell.error-cell {
+    background-color: #ffda6b !important;
+    color: var(--text-color) !important;
+}
+
+.handsontable .htCore .htInvalid,
+.handsontable .htCore .error-cell,
+.handsontable td.htInvalid,
+.handsontable td.error-cell,
+.handsontable td.custom-cell.error-cell {
+    background-color: #ffebeb !important;
+    color: var(--text-color) !important;
+}
+
+.handsontable .htCore .htWarning,
+.handsontable .htCore .warning-cell,
+.handsontable td.htWarning,
+.handsontable td.warning-cell,
+.handsontable td.custom-cell.warning-cell {
+    background-color: #ffda6b !important;
+    color: var(--text-color) !important;
+    border: 1px solid #ffc107 !important;
+}
+
+
+
+
+@media (prefers-color-scheme: dark) {
+    .handsontable .htCore .htInvalid,
+    .handsontable .htCore .error-cell,
+    .handsontable td.htInvalid,
+    .handsontable td.error-cell,
+    .handsontable td.custom-cell.error-cell {
+        background-color: #4c2020 !important;
+        color: var(--text-color) !important;
+    }
+
+    .handsontable .htCore .htWarning,
+    .handsontable .htCore .warning-cell,
+    .handsontable td.htWarning,
+    .handsontable td.warning-cell,
+    .handsontable td.custom-cell.warning-cell {
+        background-color: #ffda6b !important;
+        color: var(--text-color) !important;
+        border: 1px solid #ffc107 !important;
+    }
+
+    .handsontable .custom-cell.updated-cell {
+        background-color: #ffda6b !important;
+    }
+}
+
+/* Handsontable scrollbars */
+.handsontable .wtHolder::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+}
+
+.handsontable .wtHolder::-webkit-scrollbar-track {
+    box-shadow: inset 0 0 3px var(--border-color);
+    border-radius: 10px;
+}
+
+.handsontable .wtHolder::-webkit-scrollbar-thumb {
+    background: var(--button-primary-background);
+    border-radius: 10px;
+}
+
+.handsontable .ht_clone_left th,
+.handsontable .ht_clone_top th {
+    background-color: var(--background-color) !important;
+    color: var(--text-color) !important;
+    border-color: var(--border-color) !important;
+
+}
+
+
+/* Context menu theming */
+.htContextMenu {
+    background-color: var(--background-color) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.htContextMenu tbody tr td {
+    background-color: var(--background-color) !important;
+    color: var(--text-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+.htContextMenu tbody tr:hover td {
+    background-color: var(--button-secondary-background-hover) !important;
+    color: var(--text-color) !important;
+}
+/* Tooltip box */
+.tippy-box[data-theme~="custom"] {
+    background-color: var(--text-color) !important;
+    border: 1px solid #000000 !important;
+    border-radius: var(--border-radius) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Tooltip content */
+.tippy-content {
+    padding: 8px 12px !important;
+    color: var(--background-color) !important;
+}
