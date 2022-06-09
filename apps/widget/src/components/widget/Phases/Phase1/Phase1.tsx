@@ -1,0 +1,163 @@
+import { Flex, Group, Tooltip } from '@mantine/core';
+import { Controller } from 'react-hook-form';
+import { useMediaQuery } from '@mantine/hooks';
+
+import { PhasesEnum } from '@types';
+import { Select } from '@ui/Select';
+import { Button } from '@ui/Button';
+import { WIDGET_TEXTS } from '@importflow/client';
+
+import { DownloadIcon, BackIcon, LockIcon } from '@icons';
+import { UploadDropzone } from '@ui/UploadDropzone';
+import { usePhase1 } from '@hooks/Phase1/usePhase1';
+import { mantineConfig, MANUAL_ENTRY_LIMIT, variables } from '@config';
+
+import useStyles from './Phase1.Styles';
+import { Divider } from '@ui/Divider';
+import { Footer } from 'components/Common/Footer';
+import { SheetSelectModal } from './SheetSelectModal';
+import { DirectEntryView } from './DirectEntryView';
+
+interface IPhase1Props {
+  onNextClick: () => void;
+  hasImageUpload: boolean;
+  texts: typeof WIDGET_TEXTS;
+  onManuallyEnterData: () => void;
+  generateImageTemplate: () => void;
+}
+
+export function Phase1({
+  texts,
+  hasImageUpload,
+  onManuallyEnterData,
+  onNextClick: goNext,
+  generateImageTemplate,
+}: IPhase1Props) {
+  const { classes } = useStyles();
+  const isBiggerThanSm = useMediaQuery(`(min-width: ${mantineConfig.breakpoints?.sm}px)`);
+  const {
+    columns,
+    onSubmit,
+    control,
+    setError,
+    templates,
+    onDownloadClick,
+    excelSheetNames,
+    isUploadLoading,
+    onTemplateChange,
+    onSelectExcelSheet,
+    showSelectTemplate,
+    isDownloadInProgress,
+    onSelectSheetModalReset,
+    isExcelSheetNamesLoading,
+    hideDownloadSampleButton,
+    isManualDataEntryAvailable,
+    isDownloadFileAvailable,
+  } = usePhase1({
+    goNext,
+    texts,
+    onManuallyEnterData,
+  });
+  const onDownload = () => {
+    if (hasImageUpload) generateImageTemplate();
+    else onDownloadClick();
+  };
+
+  return (
+    <>
+      <Group className={classes.templateContainer} spacing="lg" noWrap>
+        {showSelectTemplate && (
+          <Controller
+            name={`templateId`}
+            control={control}
+            rules={{
+              required: texts.PHASE1.SELECT_SHEET_REQUIRED_MSG,
+            }}
+            render={({ field, fieldState }) => (
+              <Select
+                width="50%"
+                ref={field.ref}
+                value={field.value}
+                onChange={onTemplateChange}
+                error={fieldState.error?.message}
+                title={texts.PHASE1.SELECT_TEMPLATE_NAME}
+                placeholder={texts.PHASE1.SELECT_TEMPLATE_NAME_PLACEHOLDER}
+                data={templates?.map((template) => ({ value: template._id, label: template.name })) || []}
+              />
+            )}
+          />
+        )}
+
+        <div className={classes.download}>
+          {!hideDownloadSampleButton ? (
+            <Tooltip
+              label="This feature is not in your current plan"
+              disabled={isDownloadFileAvailable !== false}
+              position="top"
+            >
+              <Button
+                onClick={onDownload}
+                loading={isDownloadInProgress}
+                disabled={isDownloadFileAvailable === false}
+                leftIcon={
+                  isDownloadFileAvailable === false ? <LockIcon /> : hasImageUpload ? <BackIcon /> : <DownloadIcon />
+                }
+              >
+                {hasImageUpload ? texts.PHASE1.GENERATE_TEMPLATE : texts.PHASE1.DOWNLOAD_SAMPLE}
+              </Button>
+            </Tooltip>
+          ) : null}
+        </div>
+      </Group>
+
+      <Flex style={{ flexGrow: 1 }} justify="center" align="center">
+        <Flex direction={{ base: 'column', sm: 'row' }} align="stretch" justify="center" gap="xs" w="75%">
+          <Controller
+            control={control}
+            name="file"
+            render={({ field, fieldState }) => (
+              <UploadDropzone
+                texts={texts}
+                loading={isUploadLoading}
+                className={classes.contentWrapper}
+                onReject={() => {
+                  setError('file', {
+                    message: texts.PHASE1.SELECT_FILE_FORMAT_MSG,
+                    type: 'manual',
+                  });
+                }}
+                onDrop={(selectedFile) => {
+                  field.onChange(selectedFile[variables.baseIndex]);
+                  onSubmit(selectedFile[variables.baseIndex]);
+                }}
+                error={fieldState.error?.message}
+              />
+            )}
+          />
+          <Divider orientation={isBiggerThanSm ? 'vertical' : 'horizontal'} label="OR" />
+
+          <DirectEntryView
+            isManualDataEntryAvailable={isManualDataEntryAvailable}
+            texts={texts}
+            columns={columns}
+            limit={MANUAL_ENTRY_LIMIT}
+            isLoading={isUploadLoading}
+            onManuallyEnterData={onSubmit}
+            className={classes.contentWrapper}
+          />
+        </Flex>
+      </Flex>
+
+      <SheetSelectModal
+        texts={texts}
+        control={control}
+        onSubmit={onSelectExcelSheet}
+        excelSheetNames={excelSheetNames}
+        opened={!!excelSheetNames.length}
+        onClose={onSelectSheetModalReset}
+      />
+
+      <Footer active={PhasesEnum.UPLOAD} primaryButtonLoading={isUploadLoading || isExcelSheetNamesLoading} />
+    </>
+  );
+}
