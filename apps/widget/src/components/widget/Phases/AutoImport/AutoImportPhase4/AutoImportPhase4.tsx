@@ -1,0 +1,47 @@
+import { Text, Stack, Paper } from '@mantine/core';
+const parseCronExpression = require('@importflow/shared/src/utils/cronstrue');
+import { colors } from '@config';
+import { CheckIcon } from '@icons';
+import { useJobsInfo } from '@store/jobinfo.context';
+import { getFormattedFirstRunTime } from 'util/helpers/common.helpers';
+
+import { PhasesEnum } from '@types';
+import { Footer } from 'components/Common/Footer';
+
+interface IAutoImportPhase4Props {
+  onCloseClick: () => void;
+}
+
+export function AutoImportPhase4({ onCloseClick }: IAutoImportPhase4Props) {
+  const { jobsInfo } = useJobsInfo();
+
+  const getNextRunTime = () => {
+    return getFormattedFirstRunTime();
+  };
+
+  return (
+    <>
+      <Stack mt="md" align="center" style={{ flexGrow: 1 }}>
+        <CheckIcon
+          styles={{
+            backgroundColor: 'green',
+            borderRadius: '50%',
+            color: 'white',
+            width: 50,
+            height: 50,
+          }}
+        />
+        <Text fw="bold" size="xl" color={colors.lightBlue}>
+          Import Job is Scheduled From URL
+        </Text>
+        <Paper bg={colors.softBlue} style={{ maxWidth: '100%', width: 'fit-content' }} p="xl">
+          <Text color={colors.lightBlue}>{jobsInfo.url}</Text>
+        </Paper>
+        <Text fw="bold" color={colors.softGrey}>
+          First import will run at {getNextRunTime()}, then repeats {parseCronExpression.toString(jobsInfo.cron)}
+        </Text>
+      </Stack>
+      <Footer onNextClick={onCloseClick} active={PhasesEnum.CONFIRM} />
+    </>
+  );
+}
