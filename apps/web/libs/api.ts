@@ -1,0 +1,348 @@
+import getConfig from 'next/config';
+import { API_KEYS, VARIABLES } from '@config';
+
+interface Route {
+  url: (...rest: string[]) => string;
+  method: string;
+}
+
+const routes: Record<string, Route> = {
+  [API_KEYS.FETCH_ACTIVE_SUBSCRIPTION]: {
+    url: () => `/v1/user/subscription`,
+    method: 'GET',
+  },
+  [API_KEYS.ONBOARD_USER]: {
+    url: () => '/v1/auth/onboard',
+    method: 'POST',
+  },
+
+  [API_KEYS.PROJECT_INVITATION]: {
+    url: () => `/v1/team`,
+    method: 'POST',
+  },
+
+  [API_KEYS.SENT_TEAM_INVITATIONS]: {
+    url: () => `/v1/team/invitations`,
+    method: 'GET',
+  },
+
+  [API_KEYS.GET_TEAM_INVITATIONS]: {
+    url: (id: string) => `/v1/team/${id}`,
+    method: 'GET',
+  },
+
+  [API_KEYS.ACCEPT_TEAM_INVITATION]: {
+    url: (invitationId: string) => `/v1/team/${invitationId}/accept`,
+    method: 'POST',
+  },
+
+  [API_KEYS.DECLINE_TEAM_INVITATION]: {
+    url: (invitationId: string) => `/v1/team/${invitationId}/decline`,
+    method: 'DELETE',
+  },
+
+  [API_KEYS.LIST_TEAM_MEMBERS]: {
+    url: () => `/v1/team/members`,
+    method: 'GET',
+  },
+
+  [API_KEYS.UPDATE_TEAM_MEMBER_ROLE]: {
+    url: (memberId: string) => `/v1/team/${memberId}`,
+    method: 'PUT',
+  },
+
+  [API_KEYS.DELETE_TEAM_MEMBER]: {
+    url: (memberId: string) => `/v1/team/${memberId}`,
+    method: 'DELETE',
+  },
+
+  [API_KEYS.REVOKE_INVITATION]: {
+    url: (invitationId: string) => `/v1/team/${invitationId}/revoke`,
+    method: 'DELETE',
+  },
+  [API_KEYS.TEAM_MEMBER_META]: {
+    url: (projectId: string) => `/v1/team/${projectId}/members`,
+    method: 'GET',
+  },
+
+  [API_KEYS.PROJECTS_LIST]: {
+    url: () => '/v1/project',
+    method: 'GET',
+  },
+  [API_KEYS.PROJECT_CREATE]: {
+    url: () => '/v1/project',
+    method: 'POST',
+  },
+
+  [API_KEYS.PROJECT_DELETE]: {
+    url: (projectId: string) => `/v1/project/${projectId}`,
+    method: 'DELETE',
+  },
+
+  [API_KEYS.PROJECT_SWITCH]: {
+    url: (projectId) => `/v1/project/switch/${projectId}`,
+    method: 'PUT',
+  },
+  [API_KEYS.PROJECT_ENVIRONMENT]: {
+    url: (projectId) => `/v1/project/${projectId}/environment`,
+    method: 'GET',
+  },
+  [API_KEYS.PROJECT_ALLOWED_DOMAINS_GET]: {
+    url: (projectId) => `/v1/project/${projectId}/allowed-domains`,
+    method: 'GET',
+  },
+  [API_KEYS.PROJECT_ALLOWED_DOMAINS_UPDATE]: {
+    url: (projectId) => `/v1/project/${projectId}/allowed-domains`,
+    method: 'PUT',
+  },
+
+  [API_KEYS.LOGOUT]: {
+    url: () => '/v1/auth/logout',
+    method: 'GET',
+  },
+  [API_KEYS.SIGNIN]: {
+    url: () => '/v1/auth/login',
+    method: 'POST',
+  },
+  [API_KEYS.SIGNUP]: {
+    url: () => '/v1/auth/register',
+    method: 'POST',
+  },
+
+  [API_KEYS.VERIFY_EMAIL]: {
+    url: () => '/v1/auth/verify',
+    method: 'POST',
+  },
+  [API_KEYS.REQUEST_FORGOT_PASSWORD]: {
+    url: () => '/v1/auth/forgot-password/request',
+    method: 'POST',
+  },
+  [API_KEYS.RESET_PASSWORD]: {
+    url: () => `/v1/auth/forgot-password/reset`,
+    method: 'POST',
+  },
+  [API_KEYS.RESEND_OTP]: {
+    url: () => `/v1/auth/verify/resend`,
+    method: 'POST',
+  },
+  [API_KEYS.RESET_PASSWORD]: {
+    url: () => `/v1/auth/forgot-password/reset`,
+    method: 'POST',
+  },
+  [API_KEYS.ME]: {
+    url: () => `/v1/auth/me`,
+    method: 'GET',
+  },
+  [API_KEYS.UPDATE_ME_INFO]: {
+    url: () => `/v1/auth/me`,
+    method: 'PUT',
+  },
+  [API_KEYS.IMPORT_COUNT]: {
+    url: () => `/v1/user/import-count`,
+    method: 'GET',
+  },
+
+  [API_KEYS.IMPORTS_LIST]: {
+    url: (projectId) => `/v1/project/${projectId}/imports`,
+    method: 'GET',
+  },
+  [API_KEYS.TEMPLATES_LIST]: {
+    url: (projectId) => `/v1/project/${projectId}/templates`,
+    method: 'GET',
+  },
+  [API_KEYS.TEMPLATES_CREATE]: {
+    url: () => `/v1/template`,
+    method: 'POST',
+  },
+  [API_KEYS.TEMPLATE_UPDATE]: {
+    url: (templateId) => `/v1/template/${templateId}`,
+    method: 'PUT',
+  },
+  [API_KEYS.TEMPLATES_DUPLICATE]: {
+    url: (templateId) => `/v1/template/${templateId}/duplicate`,
+    method: 'POST',
+  },
+  [API_KEYS.TEMPLATE_COLUMNS_UPDATE]: {
+    url: (templateId) => `/v1/template/${templateId}/columns`,
+    method: 'PUT',
+  },
+  [API_KEYS.TEMPLATE_DELETE]: {
+    url: (templateId) => `/v1/template/${templateId}`,
+    method: 'DELETE',
+  },
+  [API_KEYS.TEMPLATE_DETAILS]: {
+    url: (templateId) => `/v1/template/${templateId}`,
+    method: 'GET',
+  },
+  [API_KEYS.TEMPLATE_COLUMNS_LIST]: {
+    url: (templateId) => `/v1/template/${templateId}/columns`,
+    method: 'GET',
+  },
+  [API_KEYS.TEMPLATE_CUSTOMIZATION_GET]: {
+    url: (templateId) => `/v1/template/${templateId}/customizations`,
+    method: 'GET',
+  },
+  [API_KEYS.TEMPLATE_CUSTOMIZATION_UPDATE]: {
+    url: (templateId) => `/v1/template/${templateId}/customizations`,
+    method: 'PUT',
+  },
+  [API_KEYS.TEMPLATE_CUSTOMIZATION_SYNC]: {
+    url: (templateId) => `/v1/template/${templateId}/customizations/sync`,
+    method: 'PUT',
+  },
+
+  [API_KEYS.TEMPLATE_SCHEMA_GET]: {
+    url: () => `/v1/template/schema`,
+    method: 'POST',
+  },
+
+  [API_KEYS.TEMPLATE_SAMPLE_CREATE]: {
+    url: () => `/v1/template`,
+    method: 'POST',
+  },
+
+  [API_KEYS.TEMPLATE_SAMPLE_GET]: {
+    url: (templateId: string) => `/v1/template/${templateId}/send-sample`,
+    method: 'POST',
+  },
+
+  // Destination
+  [API_KEYS.DESTINATION_FETCH]: {
+    url: (templateId) => `/v1/template/${templateId}/destination`,
+    method: 'GET',
+  },
+  [API_KEYS.DESTINATION_UPDATE]: {
+    url: (templateId) => `/v1/template/${templateId}/destination`,
+    method: 'PUT',
+  },
+  [API_KEYS.BUBBLEIO_MAP_COLUMNS]: {
+    url: (templateId) => `/v1/template/${templateId}/map-bubble-io-columns`,
+    method: 'PUT',
+  },
+
+  // Column
+  [API_KEYS.COLUMN_CREATE]: {
+    url: (templateId) => `/v1/column/${templateId}`,
+    method: 'POST',
+  },
+  [API_KEYS.COLUMN_UPDATE]: {
+    url: (columnId) => `/v1/column/${columnId}`,
+    method: 'PUT',
+  },
+  [API_KEYS.COLUMN_DELETE]: {
+    url: (columnId) => `/v1/column/${columnId}`,
+    method: 'DELETE',
+  },
+
+  // Activity
+  [API_KEYS.ACTIVITY_HISTORY]: {
+    url: (projectId) => `/v1/activity/${projectId}/history`,
+    method: 'GET',
+  },
+  [API_KEYS.ACTIVITY_SUMMARY]: {
+    url: (projectId) => `/v1/activity/${projectId}/summary`,
+    method: 'GET',
+  },
+  [API_KEYS.ACTIVITY_RETRY]: {
+    url: (uploadId) => `/v1/activity/${uploadId}/retry`,
+    method: 'POST',
+  },
+
+  [API_KEYS.ACTIVITY_WEBHOOK_LOGS]: {
+    url: (uploadId) => `/v1/activity/upload/${uploadId}/webhook-logs`,
+    method: 'GET',
+  },
+
+  // Security
+  [API_KEYS.REGENERATE]: {
+    url: () => `/v1/environment/api-keys/regenerate`,
+    method: 'GET',
+  },
+
+  // Validations
+  [API_KEYS.VALIDATIONS]: {
+    url: (templateId) => `/v1/template/${templateId}/validations`,
+    method: 'GET',
+  },
+  [API_KEYS.VALIDATIONS_UPDATE]: {
+    url: (templateId) => `/v1/template/${templateId}/validations`,
+    method: 'PUT',
+  },
+
+  // Activity
+  [API_KEYS.DONWLOAD_ORIGINAL_FILE]: {
+    url: (uploadId) => `/v1/upload/${uploadId}/files/original`,
+    method: 'GET',
+  },
+};
+
+function handleResponseStatusAndContentType(response: Response) {
+  const contentType = response.headers.get('content-type');
+
+  if (contentType === null) return Promise.resolve(null);
+  else if (contentType.startsWith('application/json;')) return response.json();
+  else if (contentType.startsWith('text/plain;')) return response.text();
+  else if (contentType.startsWith('text/csv')) return response.text();
+  else if (contentType.startsWith('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
+    return response.arrayBuffer();
+  } else throw new Error(`Unsupported response content-type: ${contentType}`);
+}
+
+function queryObjToString(obj?: Record<string, string | number | undefined>): string {
+  const str = [];
+  for (const key in obj)
+    if (obj.hasOwnProperty(key) && typeof obj[key] !== 'undefined') {
+      str.push(encodeURIComponent(key) + '=' + encodeURIComponent(obj[key] as any));
+    }
+
+  return str.join('&');
+}
+
+const { publicRuntimeConfig } = getConfig();
+
+export async function commonApi<T>(
+  key: keyof typeof API_KEYS,
+  {
+    parameters,
+    body,
+    cookie,
+    headers,
+    query,
+    baseUrl,
+    credentials = 'include',
+  }: {
+    parameters?: string[];
+    body?: any;
+    credentials?: 'include' | 'omit' | 'same-origin' | undefined;
+    headers?: Record<string, string>;
+    cookie?: string;
+    query?: Record<string, string | number | undefined>;
+    baseUrl?: string;
+  }
+) {
+  try {
+    const route = routes[key];
+    let url = (baseUrl || publicRuntimeConfig.NEXT_PUBLIC_API_BASE_URL) + route.url(...(parameters || []));
+    url = url + '?' + queryObjToString(query);
+    const method = route.method;
+
+    const response = await fetch(url, {
+      method,
+      body: body instanceof FormData ? body : JSON.stringify(body),
+      ...(credentials ? { credentials: credentials } : {}),
+      headers: {
+        ...(!(body instanceof FormData) && { 'Content-Type': 'application/json' }),
+        ...(headers ? headers : {}),
+        ...(cookie ? { Cookie: cookie } : {}),
+      },
+    });
+
+    if (response.status >= VARIABLES.TWO_HUNDREDS && response.status < VARIABLES.THREE_HUNDREDS) {
+      return (await handleResponseStatusAndContentType(response)) as T;
+    }
+
+    throw await handleResponseStatusAndContentType(response);
+  } catch (error) {
+    throw error;
+  }
+}
