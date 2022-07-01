@@ -1,0 +1,23 @@
+import React from 'react';
+import Link from 'next/link';
+import { Tooltip } from '@mantine/core';
+
+import { colors } from '@config';
+import { GuidePointIcon } from '@assets/icons/GuidePoint.icon';
+
+interface TooltipLinkProps {
+  label?: string;
+  link: string;
+  iconSize?: 'sm' | 'md' | 'lg';
+  iconColor?: string;
+}
+
+export function TooltipLink({ label = 'Know More', link, iconSize = 'sm' }: TooltipLinkProps) {
+  return (
+    <Tooltip label={label} withArrow>
+      <Link href={link} target="_blank" rel="referrer">
+        <GuidePointIcon size={iconSize} color={colors.BGPrimaryLight} />
+      </Link>
+    </Tooltip>
+  );
+}
