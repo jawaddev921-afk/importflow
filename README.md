@@ -2,6 +2,8 @@
 
 A complete, self-hostable CSV and Excel data import SaaS platform that handles file parsing, relational column mapping, real-time validation, and webhook dispatching for external applications.
 
+---
+
 ## What This Project Does
 
 Ingesting user-submitted CSV and Excel spreadsheets into web applications is notoriously error-prone, requiring custom parsers, schema validation rules, column matching, and error correction flows. Building bespoke import interfaces for every product distracts development teams from core business logic.
@@ -85,10 +87,92 @@ importflow/
 
 ---
 
-## Getting Started
+## Tech Stack
 
+| Layer | Technology | Purpose |
+| :--- | :--- | :--- |
+| **Monorepo Engine** | Nx 13.8 & Lerna 4.0 | Task orchestration, project dependency graph, and monorepo tooling |
+| **Backend Framework** | NestJS 8.4 (Node.js) | Modular architecture for API gateway and background queue workers |
+| **Frontend Dashboard** | Next.js 12.1 & React 17.0 | Import history, schema/destination/validator/output settings, teams, and billing |
+| **Import Widget UI** | React 17.0 & Handsontable 11.1 | In-browser spreadsheet grid with live cell validation and corrections |
+| **Language** | TypeScript 4.6 | Monorepo-wide type safety and shared contract interfaces |
+| **Primary Database** | MongoDB via Mongoose 6.2 | Document store for projects, templates, column schemas, and upload logs |
+| **Message Broker** | RabbitMQ via `amqplib` 0.8 and `amqp-connection-manager` 4.1 | Decoupled asynchronous file parsing, chunk validation, and dispatching |
+| **Object Storage** | AWS SDK v3 (S3) 3.54 & Azure Blob 12.9 | Raw upload storage for S3-compatible or Azure Blob backends |
+| **File Parsing** | `exceljs` 4.3, `xlsx` 0.20.1, `xlsx-populate` 1.21 & `papaparse` 5.3 | CSV and XLS/XLSX parsing, streaming, and spreadsheet generation |
+
+---
+
+## How to Run This Project
+
+### 1. Prerequisites
+* **Node.js**: `v16.x` or `v18.x` (the monorepo targets 2022-era tooling)
+* **Package Manager**: `pnpm` 7.x
+* **MongoDB**: Active instance running on port `27017`
+* **RabbitMQ**: Active instance running on port `5672` (management UI on `15672`)
+* **Object storage**: An S3-compatible API such as MinIO, or Azure Blob Storage, for uploaded files
+
+### 2. Clone via GitHub
+```bash
+git clone https://github.com/jawaddev921-afk/importflow.git
+cd importflow
+```
+
+### 3. Install Dependencies
 ```bash
 pnpm install
 ```
 
-Copy the environment template and follow the run commands in the project scripts.
+### 4. Environment Configuration
+Each application reads its own env file. Copy the examples manually:
+
+```bash
+cp .env.example .env
+cp apps/api/src/.example.env apps/api/src/.env
+cp apps/web/.example.env apps/web/.env
+cp apps/widget/.example.env apps/widget/.env
+cp apps/queue-manager/src/.example.env apps/queue-manager/src/.env
+```
+
+The root `.env` supplies billing/SubOS settings used by the dashboard (`NEXT_PUBLIC_PAYMENT_GATEWAY_URL`, `NEXT_PUBLIC_SUBOS_PROJECT_ID`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`). Add them to `apps/web/.env` when enabling billing.
+
+Key environment settings:
+* `MONGO_URL`: MongoDB connection string (`mongodb://localhost:27017/importflow-db`)
+* `RABBITMQ_CONN_URL`: RabbitMQ connection string (`amqp://guest:guest@localhost:5672`)
+* `JWT_SECRET`: Signing secret for user authentication tokens
+* `PORT`: API server port (default: `3000`)
+* `WIDGET_BASE_URL` / `WEB_BASE_URL`: Public widget and dashboard URLs used in links
+* `STORAGE_TYPE`: `s3` or `azure`, plus the matching storage credentials
+* `NEXT_PUBLIC_API_BASE_URL`: Dashboard-to-API URL (`http://localhost:3000`)
+* `REACT_APP_API_URL`: Widget-to-API URL (`http://localhost:3000`)
+
+### 5. Database Setup
+
+MongoDB creates collections on first write and no migrations are included in this source snapshot. Point `MONGO_URL` at a running MongoDB instance; see `libs/dal/src/repositories` for the schemas and indexes.
+
+### 6. Run
+
+* **Start All Services in Development (Parallel):**
+  ```bash
+  pnpm run start:dev
+  ```
+  Expect the API on `http://localhost:3000`, the dashboard on `http://localhost:4200`, and the widget on `http://localhost:3500`.
+
+* **Start Individual Monorepo Applications:**
+  * Start API: `pnpm run start:api`
+  * Start Queue Manager: `pnpm run start:queue-manager`
+  * Start Dashboard: `pnpm run start:web`
+  * Start Widget: `pnpm run start:widget`
+
+* **Build All Workspace Targets:**
+  ```bash
+  pnpm run build
+  ```
+
+### 7. Lint
+```bash
+pnpm run lint
+```
+
+### 8. Source Snapshot Notes
+This repository contains application source only. Tests, Docker definitions, database migrations, the lockfile, and the license file are not included. Runtime data such as uploaded files and generated import artifacts is created outside the repository. `pnpm install` runs the workspace build through the root `postinstall` hook.
